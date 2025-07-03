@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,15 +10,52 @@ const Index = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
+  const [loginError, setLoginError] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (username && password && businessName) {
-      // Store business name in localStorage for use throughout the app
-      localStorage.setItem('businessName', businessName);
-      localStorage.setItem('username', username);
-      navigate('/dashboard');
+      try {
+        setLoginError(''); // Clear any previous error
+
+        const response = await fetch('https://invoicegenerator-bktt.onrender.com/Auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            partnerName: businessName,
+            username: username,
+            password: password,
+          }),
+        });
+
+        if (!response.ok) {
+          const contentType = response.headers.get("content-type");
+          let message = 'Invalid credentials. Please try again.';
+
+          if (contentType && contentType.includes("application/json")) {
+            const errorData = await response.json();
+            message = errorData?.message || message;
+          }
+
+          setLoginError(message);
+          return;
+        }
+
+        const data = await response.json();
+        const token = data.token;
+
+        localStorage.setItem('token', token);
+        localStorage.setItem('businessName', businessName);
+        localStorage.setItem('username', username);
+
+        navigate('/dashboard');
+      } catch (err) {
+        setLoginError('Something went wrong. Please try again later.');
+      }
     }
   };
 
@@ -56,12 +92,15 @@ const Index = () => {
                   type="text"
                   placeholder="Enter your username"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    if (loginError) setLoginError('');
+                  }}
                   required
                   className="h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="password" className="flex items-center gap-2">
                   <Lock className="h-4 w-4" />
@@ -72,12 +111,15 @@ const Index = () => {
                   type="password"
                   placeholder="Enter your password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (loginError) setLoginError('');
+                  }}
                   required
                   className="h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="businessName" className="flex items-center gap-2">
                   <Briefcase className="h-4 w-4" />
@@ -88,11 +130,19 @@ const Index = () => {
                   type="text"
                   placeholder="Enter your business name"
                   value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
+                  onChange={(e) => {
+                    setBusinessName(e.target.value);
+                    if (loginError) setLoginError('');
+                  }}
                   required
                   className="h-11"
                 />
               </div>
+
+              {/* Login Error Message */}
+              {loginError && (
+                <p className="text-red-600 text-sm text-center">{loginError}</p>
+              )}
 
               <Button type="submit" className="w-full h-11 bg-blue-600 hover:bg-blue-700">
                 Login to Dashboard
