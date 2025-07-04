@@ -1,61 +1,67 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Building2, User, Lock, Briefcase } from 'lucide-react';
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useNavigate } from 'react-router-dom';
-import { Building2, User, Lock, Briefcase } from 'lucide-react';
+import { useAuth } from "@/pages/AuthContext";
 
 const Index = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
+  const { setAuthData } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (username && password && businessName) {
-      try {
-        setLoginError(''); // Clear any previous error
+    if (!username || !password || !businessName) {
+      setLoginError("Please fill all fields.");
+      return;
+    }
 
-        const response = await fetch('https://invoicegenerator-bktt.onrender.com/Auth/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            partnerName: businessName,
-            username: username,
-            password: password,
-          }),
-        });
+    setLoginError('');
+    setLoading(true);
 
-        if (!response.ok) {
-          const contentType = response.headers.get("content-type");
-          let message = 'Invalid credentials. Please try again.';
+    try {
+      const response = await fetch('https://invoicegenerator-bktt.onrender.com/Auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partnerName: businessName,
+          username,
+          password,
+        }),
+      });
 
-          if (contentType && contentType.includes("application/json")) {
-            const errorData = await response.json();
-            message = errorData?.message || message;
-          }
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        let message = 'Invalid credentials. Please try again.';
 
-          setLoginError(message);
-          return;
+        if (contentType?.includes("application/json")) {
+          const errorData = await response.json();
+          message = errorData?.message || message;
         }
 
-        const data = await response.json();
-        const token = data.token;
-
-        localStorage.setItem('token', token);
-        localStorage.setItem('businessName', businessName);
-        localStorage.setItem('username', username);
-
-        navigate('/dashboard');
-      } catch (err) {
-        setLoginError('Something went wrong. Please try again later.');
+        setLoginError(message);
+        return;
       }
+
+      const data = await response.json();
+      const token = data.token;
+
+      setAuthData(token, businessName, username); // Save in context/localStorage
+      navigate('/dashboard');
+    } catch (err) {
+      setLoginError('Something went wrong. Please try again later.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -139,13 +145,12 @@ const Index = () => {
                 />
               </div>
 
-              {/* Login Error Message */}
               {loginError && (
                 <p className="text-red-600 text-sm text-center">{loginError}</p>
               )}
 
-              <Button type="submit" className="w-full h-11 bg-blue-600 hover:bg-blue-700">
-                Login to Dashboard
+              <Button type="submit" className="w-full h-11 bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                {loading ? 'Logging in...' : 'Login to Dashboard'}
               </Button>
             </form>
           </CardContent>

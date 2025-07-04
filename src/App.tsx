@@ -14,6 +14,7 @@ import CancelInvoice from "./pages/CancelInvoice";
 import RecordPayment from "./pages/RecordPayment";
 import Statistics from "./pages/Statistics";
 import NotFound from "./pages/NotFound";
+import { AuthProvider } from "@/pages/AuthContext";
 
 const queryClient = new QueryClient();
 
@@ -22,20 +23,22 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/generate-invoice" element={<GenerateInvoice />} />
-          <Route path="/add-customer" element={<AddCustomer />} />
-          <Route path="/add-product" element={<AddProduct />} />
-          <Route path="/update-customer" element={<UpdateCustomer />} />
-          <Route path="/cancel-invoice" element={<CancelInvoice />} />
-          <Route path="/record-payment" element={<RecordPayment />} />
-          <Route path="/statistics" element={<Statistics />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider> {/* 👈 Wrap with AuthProvider */}
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/generate-invoice" element={<GenerateInvoice />} />
+            <Route path="/add-customer" element={<AddCustomer />} />
+            <Route path="/add-product" element={<AddProduct />} />
+            <Route path="/update-customer" element={<UpdateCustomer />} />
+            <Route path="/cancel-invoice" element={<CancelInvoice />} />
+            <Route path="/record-payment" element={<RecordPayment />} />
+            <Route path="/statistics" element={<Statistics />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

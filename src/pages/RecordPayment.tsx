@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,9 +6,12 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Save } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/pages/AuthContext";
 
 const RecordPayment = () => {
   const navigate = useNavigate();
+  const { token, partnerName } = useAuth();
+
   const [paymentData, setPaymentData] = useState({
     customerName: '',
     date: new Date().toISOString().split('T')[0],
@@ -21,9 +23,9 @@ const RecordPayment = () => {
     setPaymentData({ ...paymentData, [field]: value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!paymentData.customerName || !paymentData.amount || !paymentData.bankName) {
       toast({
         title: "Error",
@@ -42,21 +44,53 @@ const RecordPayment = () => {
       return;
     }
 
-    // Simulate recording payment
-    console.log('Payment Data:', paymentData);
-    
-    toast({
-      title: "Success",
-      description: `Payment of ₹${paymentData.amount} recorded successfully for ${paymentData.customerName}!`,
-    });
+    if (!token || !partnerName) {
+      toast({
+        title: "Error",
+        description: "Authorization error. Please login again.",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    // Reset form
-    setPaymentData({
-      customerName: '',
-      date: new Date().toISOString().split('T')[0],
-      bankName: '',
-      amount: ''
-    });
+    try {
+      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/PaymentEntry?partnerName=${encodeURIComponent(partnerName)}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          CustomerName: paymentData.customerName,
+          Date: paymentData.date,
+          BankName: paymentData.bankName,
+          Amount: paymentData.amount
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to record payment.");
+      }
+
+      toast({
+        title: "Success",
+        description: `Payment of ₹${paymentData.amount} recorded successfully for ${paymentData.customerName}!`,
+      });
+
+      setPaymentData({
+        customerName: '',
+        date: new Date().toISOString().split('T')[0],
+        bankName: '',
+        amount: ''
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Something went wrong while recording payment.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -130,9 +164,9 @@ const RecordPayment = () => {
                   <Save className="h-4 w-4 mr-2" />
                   Record Payment
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => navigate('/dashboard')}
                 >
                   Cancel
