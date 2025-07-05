@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,9 +19,59 @@ const RecordPayment = () => {
     amount: ''
   });
 
+  const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   const handleInputChange = (field: string, value: string) => {
     setPaymentData({ ...paymentData, [field]: value });
+    if (field === "customerName") {
+      setShowSuggestions(true);
+    }
   };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setPaymentData({ ...paymentData, customerName: suggestion });
+    setShowSuggestions(false);
+  };
+
+  const searchCustomers = async (searchValue: string) => {
+    if (!partnerName || !token) return;
+
+    try {
+      const response = await fetch(
+        `https://invoicegenerator-bktt.onrender.com/Invoices/SearchCustomers?partnerName=${encodeURIComponent(partnerName)}&searchValue=${encodeURIComponent(searchValue)}&sheetName=CustomerDetails`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch customers');
+      }
+
+      const result = await response.json();
+      setCustomerSuggestions(result);
+      setShowSuggestions(true);
+    } catch (error) {
+      console.error("Customer search error:", error);
+    }
+  };
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      const name = paymentData.customerName.trim();
+      if (name.length >= 2) {
+        searchCustomers(name);
+      } else {
+        setCustomerSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [paymentData.customerName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +134,10 @@ const RecordPayment = () => {
         bankName: '',
         amount: ''
       });
+
+      setCustomerSuggestions([]);
+      setShowSuggestions(false);
+
     } catch (error: any) {
       toast({
         title: "Error",
@@ -113,7 +167,7 @@ const RecordPayment = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
+              <div className="relative">
                 <Label htmlFor="customerName">Customer Name *</Label>
                 <Input
                   id="customerName"
@@ -122,6 +176,19 @@ const RecordPayment = () => {
                   onChange={(e) => handleInputChange('customerName', e.target.value)}
                   required
                 />
+                {showSuggestions && customerSuggestions.length > 0 && (
+                  <ul className="absolute z-10 bg-white border border-gray-300 w-full mt-1 rounded shadow max-h-48 overflow-y-auto">
+                    {customerSuggestions.map((name, index) => (
+                      <li
+                        key={index}
+                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                        onClick={() => handleSuggestionClick(name)}
+                      >
+                        {name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               <div>
