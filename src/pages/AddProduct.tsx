@@ -1,20 +1,23 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package, Save } from 'lucide-react';
+import { ArrowLeft, Package, Save, Loader } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/pages/AuthContext"; // Make sure your AuthContext exports useAuth()
 
 const AddProduct = () => {
   const navigate = useNavigate();
-  const [productName, setProductName] = useState('');
+  const { token, partnerName } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [productName, setProductName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!productName.trim()) {
       toast({
         title: "Error",
@@ -24,16 +27,46 @@ const AddProduct = () => {
       return;
     }
 
-    // Simulate saving product
-    console.log('Product Data:', { name: productName });
-    
-    toast({
-      title: "Success",
-      description: `Product "${productName}" added successfully!`,
-    });
+    if (!partnerName || !token) {
+      toast({
+        title: "Unauthorized",
+        description: "Please log in again",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    // Reset form
-    setProductName('');
+    try {
+      setIsLoading(true);
+      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/addProduct?partnerName=${partnerName}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: productName })
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err || "Failed to add product");
+      }
+
+      toast({
+        title: "Success",
+        description: `Product "${productName}" added successfully!`,
+      });
+
+      setProductName('');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: (error as Error).message || "Something went wrong",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -69,10 +102,20 @@ const AddProduct = () => {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <Button type="submit" className="flex-1">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Product
+                <Button type="submit" className="flex-1" disabled={isLoading}>
+                  {isLoading ? (
+                    <span className="flex items-center">
+                      <Loader className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </span>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Product
+                    </>
+                  )}
                 </Button>
+
                 <Button 
                   type="button" 
                   variant="outline" 
