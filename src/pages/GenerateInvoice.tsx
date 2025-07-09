@@ -1,13 +1,12 @@
-
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Plus, Trash2, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, FileText } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/pages/AuthContext";
 
 interface ProductItem {
   sNo: number;
@@ -19,6 +18,9 @@ interface ProductItem {
 
 const GenerateInvoice = () => {
   const navigate = useNavigate();
+  const { token, partnerName } = useAuth(); // Custom hook for auth
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const [invoiceData, setInvoiceData] = useState({
     invoiceNumber: `INV-${Date.now()}`,
     name: '',
@@ -26,25 +28,24 @@ const GenerateInvoice = () => {
     noOfBales: 0,
     transport: '',
   });
-  
+
   const [items, setItems] = useState<ProductItem[]>([
     { sNo: 1, productName: '', hsn: '', qty: 1, price: 0 }
   ]);
 
   const addItem = () => {
-    setItems([...items, { 
-      sNo: items.length + 1, 
-      productName: '', 
-      hsn: '', 
-      qty: 1, 
-      price: 0 
+    setItems([...items, {
+      sNo: items.length + 1,
+      productName: '',
+      hsn: '',
+      qty: 1,
+      price: 0
     }]);
   };
 
   const removeItem = (index: number) => {
     if (items.length > 1) {
       const newItems = items.filter((_, i) => i !== index);
-      // Renumber the items
       const renumberedItems = newItems.map((item, i) => ({ ...item, sNo: i + 1 }));
       setItems(renumberedItems);
     }
@@ -60,7 +61,7 @@ const GenerateInvoice = () => {
     return items.reduce((total, item) => total + (item.qty * item.price), 0);
   };
 
-  const handleGenerateInvoice = () => {
+  const handleGenerateInvoice = async () => {
     if (!invoiceData.name || items.some(item => !item.productName)) {
       toast({
         title: "Error",
@@ -70,13 +71,54 @@ const GenerateInvoice = () => {
       return;
     }
 
-    // Simulate invoice generation
-    toast({
-      title: "Success",
-      description: `Invoice ${invoiceData.invoiceNumber} generated successfully!`,
-    });
-    
-    console.log('Invoice Data:', { ...invoiceData, items });
+    try {
+      setIsGenerating(true);
+
+      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/InvoiceGenerator?partnerName=${partnerName}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ...invoiceData,
+          items
+        })
+      });
+
+      if (!response.ok) throw new Error("Failed to generate invoice");
+
+      const result = await response.json(); // { invoiceNumber, fileUrl }
+
+      // ✅ Open PDF in new tab
+      window.open(result.fileUrl, '_blank');
+
+      toast({
+        title: `Invoice ${result.invoiceNumber} Generated`,
+        description: `Invoice PDF opened in new tab.`,
+        duration: 7000,
+      });
+
+      // ✅ Reset form
+      setInvoiceData({
+        invoiceNumber: `INV-${Date.now()}`,
+        name: '',
+        currentDate: new Date().toISOString().split('T')[0],
+        noOfBales: 0,
+        transport: '',
+      });
+
+      setItems([{ sNo: 1, productName: '', hsn: '', qty: 1, price: 0 }]);
+
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: (error as Error).message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -105,7 +147,7 @@ const GenerateInvoice = () => {
                 <Input
                   id="invoiceNumber"
                   value={invoiceData.invoiceNumber}
-                  onChange={(e) => setInvoiceData({...invoiceData, invoiceNumber: e.target.value})}
+                  onChange={(e) => setInvoiceData({ ...invoiceData, invoiceNumber: e.target.value })}
                 />
               </div>
               <div>
@@ -114,7 +156,7 @@ const GenerateInvoice = () => {
                   id="currentDate"
                   type="date"
                   value={invoiceData.currentDate}
-                  onChange={(e) => setInvoiceData({...invoiceData, currentDate: e.target.value})}
+                  onChange={(e) => setInvoiceData({ ...invoiceData, currentDate: e.target.value })}
                 />
               </div>
               <div>
@@ -123,7 +165,7 @@ const GenerateInvoice = () => {
                   id="customerName"
                   placeholder="Enter customer name"
                   value={invoiceData.name}
-                  onChange={(e) => setInvoiceData({...invoiceData, name: e.target.value})}
+                  onChange={(e) => setInvoiceData({ ...invoiceData, name: e.target.value })}
                 />
               </div>
               <div>
@@ -132,7 +174,7 @@ const GenerateInvoice = () => {
                   id="transport"
                   placeholder="Transport details"
                   value={invoiceData.transport}
-                  onChange={(e) => setInvoiceData({...invoiceData, transport: e.target.value})}
+                  onChange={(e) => setInvoiceData({ ...invoiceData, transport: e.target.value })}
                 />
               </div>
               <div>
@@ -141,7 +183,7 @@ const GenerateInvoice = () => {
                   id="noOfBales"
                   type="number"
                   value={invoiceData.noOfBales}
-                  onChange={(e) => setInvoiceData({...invoiceData, noOfBales: parseInt(e.target.value) || 0})}
+                  onChange={(e) => setInvoiceData({ ...invoiceData, noOfBales: parseInt(e.target.value) || 0 })}
                 />
               </div>
             </div>
@@ -227,8 +269,8 @@ const GenerateInvoice = () => {
             </div>
 
             <div className="flex gap-4 pt-4">
-              <Button onClick={handleGenerateInvoice} className="flex-1">
-                Generate Invoice
+              <Button onClick={handleGenerateInvoice} className="flex-1" disabled={isGenerating}>
+                {isGenerating ? 'Generating Invoice...' : 'Generate Invoice'}
               </Button>
               <Button variant="outline" onClick={() => navigate('/dashboard')}>
                 Cancel
