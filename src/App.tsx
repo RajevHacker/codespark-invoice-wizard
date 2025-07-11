@@ -12,6 +12,9 @@ import AddProduct from "./pages/AddProduct";
 import UpdateCustomer from "./pages/UpdateCustomer";
 import CancelInvoice from "./pages/CancelInvoice";
 import RecordPayment from "./pages/RecordPayment";
+import AddPurchaseEntry from "./pages/AddPurchaseEntry";
+import RecordPurchasePayment from "./pages/RecordPurchasePayment";
+import ReportGeneration from "./pages/ReportGeneration";
 import Statistics from "./pages/Statistics";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "@/pages/AuthContext";
@@ -23,7 +26,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <AuthProvider> {/* 👈 Wrap with AuthProvider */}
+      <AuthProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
@@ -34,6 +37,9 @@ const App = () => (
             <Route path="/update-customer" element={<UpdateCustomer />} />
             <Route path="/cancel-invoice" element={<CancelInvoice />} />
             <Route path="/record-payment" element={<RecordPayment />} />
+            <Route path="/add-purchase-entry" element={<AddPurchaseEntry />} />
+            <Route path="/record-purchase-payment" element={<RecordPurchasePayment />} />
+            <Route path="/report-generation" element={<ReportGeneration />} />
             <Route path="/statistics" element={<Statistics />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
