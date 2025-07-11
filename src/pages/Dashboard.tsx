@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
-import { Building2, FileText, Users, Package, CreditCard, BarChart3, XCircle, LogOut , ShoppingCart, Receipt, FileBarChart } from 'lucide-react';
+import { Building2, FileText, Users, Package, CreditCard, BarChart3, XCircle, LogOut, ShoppingCart, Receipt, FileBarChart } from 'lucide-react';
 
 const Dashboard = () => {
   const [businessName, setBusinessName] = useState('');

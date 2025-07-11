@@ -26,7 +26,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <AuthProvider> {/* 👈 Wrap with AuthProvider */}
+      <AuthProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
