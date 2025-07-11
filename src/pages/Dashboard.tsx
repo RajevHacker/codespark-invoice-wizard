@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
-import { Building2, FileText, Users, Package, CreditCard, BarChart3, XCircle, LogOut } from 'lucide-react';
+import { Building2, FileText, Users, Package, CreditCard, BarChart3, XCircle, LogOut , ShoppingCart, Receipt, FileBarChart } from 'lucide-react';
 
 const Dashboard = () => {
   const [businessName, setBusinessName] = useState('');
@@ -71,6 +70,27 @@ const Dashboard = () => {
       icon: CreditCard,
       color: 'bg-teal-500',
       path: '/record-payment'
+    },
+    {
+      title: 'Add Purchase Entry',
+      description: 'Add purchase order details',
+      icon: ShoppingCart,
+      color: 'bg-yellow-500',
+      path: '/add-purchase-entry'
+    },
+    {
+      title: 'Record Purchase Payment',
+      description: 'Record payments for purchase orders',
+      icon: Receipt,
+      color: 'bg-pink-500',
+      path: '/record-purchase-payment'
+    },
+    {
+      title: 'Report Generation',
+      description: 'Generate purchase and sales reports',
+      icon: FileBarChart,
+      color: 'bg-cyan-500',
+      path: '/report-generation'
     },
     {
       title: 'Statistics',
