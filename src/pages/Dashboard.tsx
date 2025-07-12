@@ -2,13 +2,26 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
-import { Building2, FileText, Users, Package, CreditCard, BarChart3, XCircle, LogOut, ShoppingCart, Receipt, FileBarChart } from 'lucide-react';
+import { Building2, FileText, Users, Package, CreditCard, BarChart3, XCircle, LogOut, ShoppingCart, Receipt, FileBarChart, TrendingUp } from 'lucide-react';
 
 const Dashboard = () => {
   const [businessName, setBusinessName] = useState('');
   const [username, setUsername] = useState('');
   const navigate = useNavigate();
-
+  const salesStats = {
+    totalOutstanding: 125000,
+    totalPaid: 75000,
+    totalInvoices: 45,
+    activeCustomers: 12,
+    averageInvoiceValue: 8500,
+    monthlyGrowth: 15.5
+  };
+  const purchaseStats = {
+    totalPurchases: 580000,
+    totalVendors: 8,
+    averagePurchaseValue: 72500,
+    monthlyPurchaseGrowth: 10.2
+  };
   useEffect(() => {
     const storedBusinessName = localStorage.getItem('businessName');
     const storedUsername = localStorage.getItem('username');
@@ -92,13 +105,7 @@ const Dashboard = () => {
       color: 'bg-cyan-500',
       path: '/report-generation'
     },
-    {
-      title: 'Statistics',
-      description: 'View payment balance and analytics',
-      icon: BarChart3,
-      color: 'bg-indigo-500',
-      path: '/statistics'
-    }
+    
   ];
 
   return (
@@ -134,6 +141,47 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Quick Stats */}
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader className="flex items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Total Outstanding</CardTitle>
+                <TrendingUp className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              ₹{salesStats.totalOutstanding.toLocaleString()}
+            </div>
+              <p className="text-xs text-muted-foreground">Amount pending from customers</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                ₹{purchaseStats.totalPurchases.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">Total purchase amount</p>
+            </CardContent>
+          </Card>
+          
+          <Card
+  className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+  onClick={() => navigate('/statistics')}
+>
+  <div className="bg-indigo-500 p-3 rounded-lg text-white flex items-center justify-center">
+    <BarChart3 className="w-6 h-6" />
+  </div>
+  <div>
+    <h3 className="text-base font-semibold text-gray-900">Statistics</h3>
+    <p className="text-sm text-gray-500">View payment balance and analytics</p>
+  </div>
+</Card>
+        </div>
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Dashboard</h2>
           <p className="text-gray-600">Manage your invoices, customers, and business operations</p>
@@ -161,39 +209,6 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           ))}
-        </div>
-
-        {/* Quick Stats */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Invoices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">0</div>
-              <p className="text-xs text-gray-600">Generated this month</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Customers</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">0</div>
-              <p className="text-xs text-gray-600">Active customers</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Pending Payments</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">₹0</div>
-              <p className="text-xs text-gray-600">Outstanding balance</p>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>
