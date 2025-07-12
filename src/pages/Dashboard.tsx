@@ -169,18 +169,15 @@ const Dashboard = () => {
             </CardContent>
           </Card>
           
-          <Card
-  className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-  onClick={() => navigate('/statistics')}
->
-  <div className="bg-indigo-500 p-3 rounded-lg text-white flex items-center justify-center">
-    <BarChart3 className="w-6 h-6" />
-  </div>
-  <div>
-    <h3 className="text-base font-semibold text-gray-900">Statistics</h3>
-    <p className="text-sm text-gray-500">View payment balance and analytics</p>
-  </div>
-</Card>
+          <Card className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer"  onClick={() => navigate('/statistics')}>
+            <div className="bg-indigo-500 p-3 rounded-lg text-white flex items-center justify-center">
+              <BarChart3 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">Statistics</h3>
+              <p className="text-sm text-gray-500">View payment balance and analytics</p>
+            </div>
+          </Card>
         </div>
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Dashboard</h2>
