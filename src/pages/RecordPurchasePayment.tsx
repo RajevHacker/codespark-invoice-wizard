@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Loader } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -31,54 +32,36 @@ const RecordPurchasePayment = () => {
   const [results, setResults] = useState<PurchaseBalance[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<PurchaseBalance | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentDate, setPaymentDate] = useState('');
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const handleSearch = async () => {
-    if (!searchTerm) {
-      toast({
-        title: "Error",
-        description: "Please enter a customer name to search",
-        variant: "destructive",
-      });
+    if (!searchTerm.trim()) {
+      toast({ title: "Error", description: "Enter customer name", variant: "destructive" });
+      return;
+    }
+    if (!token || !partnerName) {
+      toast({ title: "Error", description: "Authentication missing", variant: "destructive" });
       return;
     }
 
-    if (!token || !partnerName) {
-      toast({
-        title: "Error",
-        description: "Authentication is missing",
-        variant: "destructive",
-      });
-      return;
-    }
+    setIsLoading(true);
+    setResults([]);
 
     try {
-      setIsLoading(true);
-      setResults([]);  // Clear previous results immediately
-      const response = await fetch(
+      const resp = await fetch(
         `http://localhost:5062/Invoices/purchasePaymentPending?partnerName=${partnerName}&customerName=${encodeURIComponent(searchTerm)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch purchase balances");
-      }
-
-      const data: PurchaseBalance[] = await response.json();
+      if (!resp.ok) throw new Error("Failed to fetch");
+      const data: PurchaseBalance[] = await resp.json();
       setResults(data);
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: "Error",
-        description: "Unable to fetch purchase data",
-        variant: "destructive",
-      });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error", description: "Unable to fetch pending invoices", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -86,47 +69,56 @@ const RecordPurchasePayment = () => {
 
   const handlePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!selectedSupplier || !paymentAmount || !paymentDate || !paymentMode) {
-      toast({
-        title: "Error",
-        description: "Please fill in all payment details",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Fill all fields", variant: "destructive" });
       return;
     }
 
     const amount = parseFloat(paymentAmount);
-    if (amount <= 0 || amount > selectedSupplier.balanceAmount) {
-      toast({
-        title: "Error",
-        description: `Payment must be between ₹1 and ₹${selectedSupplier.balanceAmount}`,
-        variant: "destructive",
-      });
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Error", description: `Amount must be greater than 0`, variant: "destructive" });
       return;
     }
 
-    const paymentData = {
-      invoiceNumber: selectedSupplier.invoiceNumber,
-      customerName: selectedSupplier.customerName,
-      paymentAmount: amount,
-      paymentDate,
-      paymentMode,
+    setShowConfirmModal(true);
+  };
+
+  const confirmSubmit = async () => {
+    if (!token || !partnerName || !selectedSupplier) return;
+
+    const payload = {
+      CustomerName: selectedSupplier.customerName,
+      Date: paymentDate,
+      BankName: paymentMode,
+      Amount: paymentAmount
     };
 
-    console.log("Submitted Purchase Payment:", paymentData);
-
-    toast({
-      title: "Success",
-      description: `Payment of ₹${amount} recorded successfully`,
-    });
-
-    setSelectedSupplier(null);
-    setPaymentAmount('');
-    setPaymentDate('');
-    setPaymentMode('');
-    setSearchTerm('');
-    setResults([]);
+    try {
+      const resp = await fetch(
+        `http://localhost:5062/Invoices/PaymentEntry?partnerName=${partnerName}&paymentType=PurchasePayment`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!resp.ok) throw new Error("Failed to record payment");
+      toast({ title: "Success", description: `₹${parseFloat(paymentAmount).toLocaleString()} recorded!` });
+      setSelectedSupplier(null);
+      setPaymentAmount('');
+      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setPaymentMode('');
+      setSearchTerm('');
+      setResults([]);
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error", description: "Payment record failed", variant: "destructive" });
+    } finally {
+      setShowConfirmModal(false);
+    }
   };
 
   return (
@@ -143,73 +135,56 @@ const RecordPurchasePayment = () => {
         <Card>
           <CardHeader>
             <CardTitle>Search Customer</CardTitle>
-            <CardDescription>Enter the customer name to see pending purchase invoices</CardDescription>
+            <CardDescription>Find pending purchase invoices</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 items-center">
+            <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }} className="flex gap-4 items-center">
               <Input
-                placeholder="Enter customer name"
+                placeholder="Customer name"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <Button onClick={handleSearch} disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader className="h-4 w-4 animate-spin mr-2" />
-                    Loading
-                  </>
-                ) : (
-                  <>
-                    <Search className="h-4 w-4 mr-2" />
-                    Search
-                  </>
-                )}
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? <><Loader className="h-4 w-4 animate-spin mr-2" />Loading</> : <><Search className="h-4 w-4 mr-2" />Search</>}
               </Button>
-            </div>
+            </form>
           </CardContent>
         </Card>
 
         {results.length > 0 && (
           <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Pending Invoices</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Pending Invoices</CardTitle></CardHeader>
             <CardContent>
-              <div className="overflow-auto">
-                <table className="min-w-full border text-sm text-left">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="border px-4 py-2">Customer Name</th>
-                      <th className="border px-4 py-2">Invoice Date</th>
-                      <th className="border px-4 py-2">Invoice No.</th>
-                      <th className="border px-4 py-2">Grand Total</th>
-                      <th className="border px-4 py-2">Balance</th>
-                      <th className="border px-4 py-2">Status</th>
-                      <th className="border px-4 py-2">Action</th>
+              <table className="min-w-full border text-sm text-left">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border px-4">Customer</th>
+                    <th className="border px-4">Date</th>
+                    <th className="border px-4">Invoice</th>
+                    <th className="border px-4">Total</th>
+                    <th className="border px-4">Balance</th>
+                    <th className="border px-4">Status</th>
+                    <th className="border px-4">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((r) => (
+                    <tr key={r.invoiceNumber} className="hover:bg-gray-50">
+                      <td className="border px-4">{r.customerName}</td>
+                      <td className="border px-4">{r.date || '-'}</td>
+                      <td className="border px-4">{r.invoiceNumber}</td>
+                      <td className="border px-4">₹{r.grandTotal.toLocaleString()}</td>
+                      <td className="border px-4 text-red-600">₹{r.balanceAmount.toLocaleString()}</td>
+                      <td className="border px-4">{r.paymentStatus}</td>
+                      <td className="border px-4">
+                        <Button variant="secondary" onClick={() => setSelectedSupplier(r)}>
+                          Record
+                        </Button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((supplier) => (
-                      <tr key={supplier.invoiceNumber} className="hover:bg-gray-50">
-                        <td className="border px-4 py-2">{supplier.customerName}</td>
-                        <td className="border px-4 py-2">{supplier.date || '-'}</td>
-                        <td className="border px-4 py-2">{supplier.invoiceNumber}</td>
-                        <td className="border px-4 py-2">₹{supplier.grandTotal.toLocaleString()}</td>
-                        <td className="border px-4 py-2 text-red-600">₹{supplier.balanceAmount.toLocaleString()}</td>
-                        <td className="border px-4 py-2">{supplier.paymentStatus}</td>
-                        <td className="border px-4 py-2">
-                          <Button
-                            variant="secondary"
-                            onClick={() => setSelectedSupplier(supplier)}
-                          >
-                            Record
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </CardContent>
           </Card>
         )}
@@ -219,7 +194,7 @@ const RecordPurchasePayment = () => {
             <CardHeader>
               <CardTitle>Record Payment</CardTitle>
               <CardDescription>
-                For <strong>{selectedSupplier.customerName}</strong> - Invoice: <strong>{selectedSupplier.invoiceNumber}</strong>
+                For <strong>{selectedSupplier.customerName}</strong> — Invoice: <strong>{selectedSupplier.invoiceNumber}</strong>
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -230,19 +205,16 @@ const RecordPurchasePayment = () => {
                     <Input
                       id="paymentAmount"
                       type="number"
-                      min="0"
-                      max={selectedSupplier.balanceAmount}
+                      min="1"
                       step="0.01"
                       value={paymentAmount}
                       onChange={(e) => setPaymentAmount(e.target.value)}
-                      placeholder="Enter payment amount"
                       required
                     />
                     <p className="text-sm text-gray-600">
-                      Available balance: ₹{selectedSupplier.balanceAmount.toLocaleString()}
+                      Available: ₹{selectedSupplier.balanceAmount.toLocaleString()}
                     </p>
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="paymentDate">Payment Date *</Label>
                     <Input
@@ -253,13 +225,10 @@ const RecordPurchasePayment = () => {
                       required
                     />
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="paymentMode">Payment Mode *</Label>
                     <Select value={paymentMode} onValueChange={setPaymentMode} required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select payment mode" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select mode" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="cash">Cash</SelectItem>
                         <SelectItem value="cheque">Cheque</SelectItem>
@@ -272,21 +241,32 @@ const RecordPurchasePayment = () => {
                 </div>
 
                 <div className="flex justify-end gap-4 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setSelectedSupplier(null)}
-                  >
+                  <Button variant="outline" onClick={() => setSelectedSupplier(null)}>
                     Cancel
                   </Button>
-                  <Button type="submit">
-                    Record Payment
-                  </Button>
+                  <Button type="submit">Record Payment</Button>
                 </div>
               </form>
             </CardContent>
           </Card>
         )}
+
+        {/* Confirm Modal */}
+        <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm Payment</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 text-sm text-gray-700">
+              <p><strong>Name:</strong> {selectedSupplier?.customerName}</p>
+              <p><strong>Amount:</strong> ₹{parseFloat(paymentAmount || '0').toLocaleString()}</p>
+            </div>
+            <DialogFooter className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setShowConfirmModal(false)}>Cancel</Button>
+              <Button onClick={confirmSubmit}>Confirm</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
