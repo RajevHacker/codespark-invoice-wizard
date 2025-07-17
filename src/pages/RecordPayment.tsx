@@ -104,7 +104,7 @@ const RecordPayment = () => {
     }
 
     try {
-      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/PaymentEntry?partnerName=${encodeURIComponent(partnerName)}`, {
+      const response = await fetch(`https://invoicegenerator-bktt.onrender.com//Invoices/PaymentEntry?partnerName=${encodeURIComponent(partnerName)}&paymentType=Payments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

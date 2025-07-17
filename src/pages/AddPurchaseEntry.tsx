@@ -1,5 +1,11 @@
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from 'react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,12 +13,6 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
-
-// Simulated customer database (replace with real API later)
-const customerDB = [
-  { name: "Krishna Tex", gst: "27AACFK1234R1ZQ" },
-  { name: "Shree Fabrics", gst: "27AACFS7890D1ZW" },
-];
 
 const AddPurchaseEntry = () => {
   const navigate = useNavigate();
@@ -27,14 +27,58 @@ const AddPurchaseEntry = () => {
   const [amountBeforeTax, setAmountBeforeTax] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [customerOptions, setCustomerOptions] = useState<{ name: string; gstNumber: string }[]>([]);
+
   const cgst = Math.round(amountBeforeTax * 0.025);
   const sgst = Math.round(amountBeforeTax * 0.025);
   const grandTotal = amountBeforeTax + cgst + sgst;
 
-  const handleCustomerBlur = () => {
-    const match = customerDB.find(c => c.name.toLowerCase() === customerName.toLowerCase());
-    setGstNumber(match ? match.gst : '');
+  const handleCustomerSelect = (option: { name: string; gstNumber: string }) => {
+    setCustomerName(option.name);
+    setGstNumber(option.gstNumber);
+    setCustomerOptions([]);
   };
+
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      if (!customerName || customerName.length < 2) {
+        setCustomerOptions([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `https://invoicegenerator-bktt.onrender.com/Invoices/getPurchaseCustomerGST?partnerName=${partnerName}&consumerName=${encodeURIComponent(customerName)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        console.log("Raw response:", response);
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Parsed data:", data);
+          setCustomerOptions(data || []);
+        } else {
+          const errorText = await response.text();
+          console.error("Fetch error (non-OK):", response.status, errorText);
+          setCustomerOptions([]);
+        }
+      } catch (err) {
+        console.error("Fetch failed with error:", err);
+        setCustomerOptions([]);
+      }
+    };
+
+    const debounce = setTimeout(() => {
+      fetchCustomers();
+    }, 300);
+
+    return () => clearTimeout(debounce);
+  }, [customerName, partnerName, token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +145,6 @@ const AddPurchaseEntry = () => {
       setHsnCode('');
       setQuantity(1);
       setAmountBeforeTax(0);
-
     } catch (err) {
       toast({
         title: "Error",
@@ -132,16 +175,31 @@ const AddPurchaseEntry = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="relative">
                   <Label htmlFor="customerName">Customer Name *</Label>
                   <Input
                     id="customerName"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    onBlur={handleCustomerBlur}
                     placeholder="e.g., Krishna Tex"
                     required
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.preventDefault();
+                    }}
                   />
+                  {customerOptions.length > 0 && (
+                    <div className="absolute z-10 bg-white border w-full rounded-md shadow-md mt-1 max-h-48 overflow-y-auto">
+                      {customerOptions.map((option, index) => (
+                        <div
+                          key={index}
+                          onClick={() => handleCustomerSelect(option)}
+                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                        >
+                          {option.name} – {option.gstNumber}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="gstNumber">GST Number</Label>

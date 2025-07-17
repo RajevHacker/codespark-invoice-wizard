@@ -52,7 +52,7 @@ const RecordPurchasePayment = () => {
 
     try {
       const resp = await fetch(
-        `http://localhost:5062/Invoices/purchasePaymentPending?partnerName=${partnerName}&customerName=${encodeURIComponent(searchTerm)}`,
+        `https://invoicegenerator-bktt.onrender.com/Invoices/purchasePaymentPending?partnerName=${partnerName}&customerName=${encodeURIComponent(searchTerm)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -95,7 +95,7 @@ const RecordPurchasePayment = () => {
 
     try {
       const resp = await fetch(
-        `http://localhost:5062/Invoices/PaymentEntry?partnerName=${partnerName}&paymentType=PurchasePayment`,
+        `https://invoicegenerator-bktt.onrender.com/Invoices/PaymentEntry?partnerName=${partnerName}&paymentType=PurchasePayment`,
         {
           method: "POST",
           headers: {
