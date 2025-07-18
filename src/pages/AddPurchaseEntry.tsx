@@ -56,19 +56,14 @@ const AddPurchaseEntry = () => {
           }
         );
 
-        console.log("Raw response:", response);
-
         if (response.ok) {
           const data = await response.json();
-          console.log("Parsed data:", data);
           setCustomerOptions(data || []);
         } else {
-          const errorText = await response.text();
-          console.error("Fetch error (non-OK):", response.status, errorText);
           setCustomerOptions([]);
         }
       } catch (err) {
-        console.error("Fetch failed with error:", err);
+        console.error("Fetch failed:", err);
         setCustomerOptions([]);
       }
     };
@@ -80,6 +75,47 @@ const AddPurchaseEntry = () => {
     return () => clearTimeout(debounce);
   }, [customerName, partnerName, token]);
 
+  const handleUpsertCustomer = async () => {
+    if (!customerName || !gstNumber) {
+      toast({
+        title: "Missing Fields",
+        description: "Please enter both Customer Name and GST Number.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5062/Invoices/updatePurchaseCustomerGST?partnerName=${partnerName}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: customerName,
+          gstNumber: gstNumber
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || 'Failed to update GST');
+      }
+
+      toast({
+        title: "GST Updated",
+        description: "GST number saved successfully."
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: (error as Error).message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -87,7 +123,7 @@ const AddPurchaseEntry = () => {
       toast({
         title: "Missing Fields",
         description: "Please fill all required fields",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
@@ -138,7 +174,6 @@ const AddPurchaseEntry = () => {
         description: "Purchase entry saved successfully"
       });
 
-      // Reset form
       setCustomerName('');
       setGstNumber('');
       setInvoiceNumber('');
@@ -203,12 +238,17 @@ const AddPurchaseEntry = () => {
                 </div>
                 <div>
                   <Label htmlFor="gstNumber">GST Number</Label>
-                  <Input
-                    id="gstNumber"
-                    value={gstNumber}
-                    onChange={(e) => setGstNumber(e.target.value)}
-                    placeholder="Enter GST if not autofilled"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="gstNumber"
+                      value={gstNumber}
+                      onChange={(e) => setGstNumber(e.target.value)}
+                      placeholder="Enter GST if not autofilled"
+                    />
+                    <Button type="button" onClick={handleUpsertCustomer}>
+                      Upsert
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardContent>
