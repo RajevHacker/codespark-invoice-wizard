@@ -86,7 +86,7 @@ const AddPurchaseEntry = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:5062/Invoices/updatePurchaseCustomerGST?partnerName=${partnerName}`, {
+      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/updatePurchaseCustomerGST?partnerName=${partnerName}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
