@@ -110,6 +110,14 @@ const ReportGeneration = () => {
     pdf.setTextColor(100);
     pdf.text(subTitle, 40, 60);
   
+    // ✅ Step 1: Calculate grand totals
+    const totalBeforeGSTSum = reportData.reduce((sum, item) => sum + item.totalBeforeGST, 0);
+    const cgstSum = reportData.reduce((sum, item) => sum + item.cgst, 0);
+    const sgstSum = reportData.reduce((sum, item) => sum + item.sgst, 0);
+    const igstSum = reportData.reduce((sum, item) => sum + item.igst, 0);
+    const grandTotalSum = reportData.reduce((sum, item) => sum + item.grandTotal, 0);
+    const qtyTotal = reportData.reduce((sum, item) => sum + item.qty, 0);
+  
     autoTable(pdf, {
       startY: 80,
       head: [[
@@ -128,28 +136,40 @@ const ReportGeneration = () => {
         item.date,
         item.customerName,
         item.gstNumber || "-",
-        item.invoiceNumber.toString(), //length > 12 ? item.invoiceNumber.slice(0, 12) + '…' : item.invoiceNumber, // truncate if too long
+        item.invoiceNumber,
         item.qty.toString(),
-        `${item.totalBeforeGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        `${item.cgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        `${item.sgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        `${item.igst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        `${item.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        item.totalBeforeGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        item.cgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        item.sgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        item.igst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        item.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       ]),
+      // ✅ Step 2: Add grand total footer row
+      foot: [[
+        '', '', '', 'Grand Total',
+        qtyTotal.toString(),
+        totalBeforeGSTSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        cgstSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        sgstSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        igstSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        grandTotalSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      ]],
       margin: { top: 80, bottom: 40, left: 20, right: 20 },
       styles: { fontSize: 8, cellPadding: 3 },
       theme: 'grid',
       headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      footStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: 'bold' },
       showHead: 'everyPage',
+      showFoot: 'lastPage',
       columnStyles: {
-        3: { cellWidth: 60 }, // Invoice Number
+        3: { cellWidth: 70 }, // Invoice Number
         5: { halign: 'right' }, // Total before GST
         6: { halign: 'right' }, // CGST
         7: { halign: 'right' }, // SGST
         8: { halign: 'right' }, // IGST
         9: { halign: 'right' }, // Grand Total
       },
-      didDrawPage: (data) => {
+      didDrawPage: () => {
         pdf.setFontSize(10);
         pdf.text(
           `Page ${pdf.getNumberOfPages()}`,
