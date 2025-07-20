@@ -1,130 +1,173 @@
+import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  Card, CardContent, CardDescription, CardHeader, CardTitle 
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useNavigate } from 'react-router-dom';
+import { 
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
+} from "@/components/ui/select";
+import { 
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
+} from "@/components/ui/table";
+
 import { ArrowLeft, FileText, Download } from 'lucide-react';
+
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/pages/AuthContext";
 
 interface ReportData {
-  id: string;
-  date: string;
   customerName: string;
-  type: 'purchase' | 'sales';
-  amount: number;
-  poNumber?: string;
-  invoiceNumber?: string;
+  gstNumber: string;
+  invoiceNumber: string;
+  date: string;
+  totalBeforeGST: number;
+  qty: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  grandTotal: number;
 }
 
 const ReportGeneration = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+  const { token, partnerName } = useAuth();
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  // State variables for filters
   const [reportType, setReportType] = useState<'purchase' | 'sales' | ''>('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [customerName, setCustomerName] = useState('');
+  
+  // State for fetched report data and UI control
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [showReport, setShowReport] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Mock data for demonstration
-  const mockData: ReportData[] = [
-    {
-      id: '1',
-      date: '2024-01-15',
-      customerName: 'ABC Industries',
-      type: 'sales',
-      amount: 50000,
-      invoiceNumber: 'INV-001'
-    },
-    {
-      id: '2',
-      date: '2024-01-16',
-      customerName: 'ABC Suppliers Ltd',
-      type: 'purchase',
-      amount: 30000,
-      poNumber: 'PO-001'
-    },
-    {
-      id: '3',
-      date: '2024-01-18',
-      customerName: 'XYZ Corp',
-      type: 'sales',
-      amount: 75000,
-      invoiceNumber: 'INV-002'
-    },
-    {
-      id: '4',
-      date: '2024-01-20',
-      customerName: 'XYZ Trading Co',
-      type: 'purchase',
-      amount: 45000,
-      poNumber: 'PO-002'
-    },
-    {
-      id: '5',
-      date: '2024-01-22',
-      customerName: 'Tech Solutions',
-      type: 'sales',
-      amount: 25000,
-      invoiceNumber: 'INV-003'
-    }
-  ];
-
-  const generateReport = () => {
+  // Fetch report data from API based on filters
+  const generateReport = async () => {
     if (!reportType) {
-      toast({
-        title: "Error",
-        description: "Please select a report type",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Please select a report type", variant: "destructive" });
+      return;
+    }
+    if (!token || !partnerName) {
+      toast({ title: "Authentication Error", description: "You are not authenticated. Please login again.", variant: "destructive" });
       return;
     }
 
-    let filteredData = mockData.filter(item => item.type === reportType);
-
-    // Filter by date range
-    if (startDate && endDate) {
-      filteredData = filteredData.filter(item => {
-        const itemDate = new Date(item.date);
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        return itemDate >= start && itemDate <= end;
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        startDate: startDate || '',
+        endDate: endDate || '',
+        customerName: customerName || '',
+        partnerName,
       });
+
+      const url = reportType === 'sales'
+        ? `http://localhost:5062/Invoices/GetSalesList?${params}`
+        : `http://localhost:5062/Invoices/GetPurchaseList?${params}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch report data");
+
+      const data = await res.json();
+      setReportData(data);
+      setShowReport(true);
+
+      toast({ title: "Success", description: `${reportType === 'purchase' ? 'Purchase' : 'Sales'} report generated successfully` });
+    } catch (error) {
+      console.error("Error during report generation:", error);
+      toast({ title: "Error", description: "Something went wrong while generating the report", variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-
-    // Filter by customer name
-    if (customerName) {
-      filteredData = filteredData.filter(item =>
-        item.customerName.toLowerCase().includes(customerName.toLowerCase())
-      );
-    }
-
-    setReportData(filteredData);
-    setShowReport(true);
-
-    toast({
-      title: "Success",
-      description: `${reportType === 'purchase' ? 'Purchase' : 'Sales'} report generated successfully`,
-    });
   };
 
+  // Export the report data to PDF using jsPDF + autoTable
   const downloadReport = () => {
-    toast({
-      title: "Download Started",
-      description: "Report download will start shortly",
+    const pdf = new jsPDF('p', 'pt', 'a4');
+  
+    const title = reportType === 'purchase' ? 'Purchase Report' : 'Sales Report';
+    const dateRange = `${startDate || 'Start'} to ${endDate || 'End'}`;
+    const customerFilter = customerName ? ` | Customer: ${customerName}` : '';
+    const subTitle = `${reportData.length} records found for ${dateRange}${customerFilter}`;
+  
+    pdf.setFontSize(18);
+    pdf.text(title, 40, 40);
+  
+    pdf.setFontSize(12);
+    pdf.setTextColor(100);
+    pdf.text(subTitle, 40, 60);
+  
+    autoTable(pdf, {
+      startY: 80,
+      head: [[
+        "Date",
+        "Customer",
+        "GST Number",
+        "Invoice Number",
+        "Qty",
+        "Total before GST",
+        "CGST",
+        "SGST",
+        "IGST",
+        "Grand Total"
+      ]],
+      body: reportData.map(item => [
+        item.date,
+        item.customerName,
+        item.gstNumber || "-",
+        item.invoiceNumber.toString(), //length > 12 ? item.invoiceNumber.slice(0, 12) + '…' : item.invoiceNumber, // truncate if too long
+        item.qty.toString(),
+        `${item.totalBeforeGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `${item.cgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `${item.sgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `${item.igst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `${item.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ]),
+      margin: { top: 80, bottom: 40, left: 20, right: 20 },
+      styles: { fontSize: 8, cellPadding: 3 },
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      showHead: 'everyPage',
+      columnStyles: {
+        3: { cellWidth: 60 }, // Invoice Number
+        5: { halign: 'right' }, // Total before GST
+        6: { halign: 'right' }, // CGST
+        7: { halign: 'right' }, // SGST
+        8: { halign: 'right' }, // IGST
+        9: { halign: 'right' }, // Grand Total
+      },
+      didDrawPage: (data) => {
+        pdf.setFontSize(10);
+        pdf.text(
+          `Page ${pdf.getNumberOfPages()}`,
+          pdf.internal.pageSize.getWidth() - 50,
+          pdf.internal.pageSize.getHeight() - 10
+        );
+      }
     });
-    // In a real application, this would generate and download a PDF or Excel file
+  
+    pdf.save(`${reportType}-report.pdf`);
   };
 
+  // Calculate total amount of all report rows
   const getTotalAmount = () => {
-    return reportData.reduce((sum, item) => sum + item.amount, 0);
+    return reportData.reduce((sum, item) => sum + item.grandTotal, 0);
   };
 
+  // Reset all filters and clear report data
   const resetFilters = () => {
     setReportType('');
     setStartDate('');
@@ -146,18 +189,15 @@ const ReportGeneration = () => {
         </div>
 
         <div className="space-y-6">
-          {/* Report Filters */}
           <Card>
             <CardHeader>
               <CardTitle>Report Filters</CardTitle>
-              <CardDescription>
-                Generate reports based on date range and customer name
-              </CardDescription>
+              <CardDescription>Generate reports based on date range and customer name</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="reportType">Report Type *</Label>
+                  <Label>Report Type *</Label>
                   <Select value={reportType} onValueChange={(value: 'purchase' | 'sales') => setReportType(value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select report type" />
@@ -170,57 +210,37 @@ const ReportGeneration = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="startDate">Start Date</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
+                  <Label>Start Date</Label>
+                  <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="endDate">End Date</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
+                  <Label>End Date</Label>
+                  <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="customerName">Customer Name</Label>
-                  <Input
-                    id="customerName"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Enter customer name"
-                  />
+                  <Label>Customer Name</Label>
+                  <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter customer name" />
                 </div>
               </div>
 
               <div className="flex gap-4">
-                <Button onClick={generateReport}>
+                <Button onClick={generateReport} disabled={loading}>
                   <FileText className="h-4 w-4 mr-2" />
-                  Generate Report
+                  {loading ? 'Generating...' : 'Generate Report'}
                 </Button>
-                <Button variant="outline" onClick={resetFilters}>
-                  Reset Filters
-                </Button>
+                <Button variant="outline" onClick={resetFilters}>Reset Filters</Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Report Results */}
           {showReport && (
-            <Card>
+            <Card ref={reportRef} className="report-card">
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <div>
-                    <CardTitle>
-                      {reportType === 'purchase' ? 'Purchase Report' : 'Sales Report'}
-                    </CardTitle>
+                    <CardTitle>{reportType === 'purchase' ? 'Purchase Report' : 'Sales Report'}</CardTitle>
                     <CardDescription>
                       {reportData.length} records found
                       {startDate && endDate && ` for ${startDate} to ${endDate}`}
@@ -240,32 +260,42 @@ const ReportGeneration = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Date</TableHead>
-                          <TableHead>Customer Name</TableHead>
-                          <TableHead>{reportType === 'purchase' ? 'PO Number' : 'Invoice Number'}</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>GST</TableHead>
+                          <TableHead>Invoice</TableHead>
+                          <TableHead>Qty</TableHead>
+                          <TableHead>Total Before GST</TableHead>
+                          <TableHead>CGST</TableHead>
+                          <TableHead>SGST</TableHead>
+                          <TableHead>IGST</TableHead>
+                          <TableHead>Grand Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {reportData.map((item) => (
-                          <TableRow key={item.id}>
+                        {reportData.map((item, idx) => (
+                          <TableRow key={idx}>
                             <TableCell>{item.date}</TableCell>
                             <TableCell>{item.customerName}</TableCell>
-                            <TableCell>
-                              {reportType === 'purchase' ? item.poNumber : item.invoiceNumber}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              ₹{item.amount.toLocaleString()}
-                            </TableCell>
+                            <TableCell>{item.gstNumber || '-'}</TableCell>
+                            <TableCell>{item.invoiceNumber}</TableCell>
+                            <TableCell>{item.qty}</TableCell>
+                            {/* <TableCell>₹{item.totalBeforeGST.toLocaleString()}</TableCell>
+                            <TableCell>₹{item.cgst.toFixed(2)}</TableCell>
+                            <TableCell>₹{item.sgst.toFixed(2)}</TableCell>
+                            <TableCell>₹{item.igst.toFixed(2)}</TableCell>
+                            <TableCell className="font-semibold">₹{item.grandTotal.toLocaleString()}</TableCell> */}
+                            <TableCell>{item.totalBeforeGST.toLocaleString()}</TableCell>
+                            <TableCell>{item.cgst.toFixed(2)}</TableCell>
+                            <TableCell>{item.sgst.toFixed(2)}</TableCell>
+                            <TableCell>{item.igst.toFixed(2)}</TableCell>
+                            <TableCell className="font-semibold">{item.grandTotal.toLocaleString()}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                    
                     <div className="flex justify-end mt-4 pt-4 border-t">
-                      <div className="text-right">
-                        <div className="text-lg font-semibold">
-                          Total Amount: ₹{getTotalAmount().toLocaleString()}
-                        </div>
+                      <div className="text-right text-lg font-semibold">
+                        Total Amount: ₹{getTotalAmount().toLocaleString()}
                       </div>
                     </div>
                   </>
