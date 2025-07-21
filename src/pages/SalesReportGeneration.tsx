@@ -50,6 +50,13 @@ const ReportGeneration = () => {
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [showReport, setShowReport] = useState(false);
   const [loading, setLoading] = useState(false);
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
   
   // Fetch report data from API based on filters
   const generateReport = async () => {
@@ -99,7 +106,7 @@ const ReportGeneration = () => {
     const pdf = new jsPDF('p', 'pt', 'a4');
   
     const title = `${partnerName} Sales Report`;
-    const dateRange = `${startDate || 'Start'} to ${endDate || 'End'}`;
+    const dateRange = `${formatDate(startDate) || 'Start'} to ${formatDate(endDate) || 'End'}`;
     const customerFilter = customerName ? ` | Customer: ${customerName}` : '';
     const subTitle = `${reportData.length} records found for ${dateRange}${customerFilter}`;
   
@@ -133,7 +140,7 @@ const ReportGeneration = () => {
         "Grand Total"
       ]],
       body: reportData.map(item => [
-        item.date,
+        formatDate(item.date),
         item.customerName,
         item.gstNumber || "-",
         item.invoiceNumber,
@@ -252,10 +259,10 @@ const ReportGeneration = () => {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <div>
-                  <CardTitle>Sales Report</CardTitle>
+                  <CardTitle>{partnerName} Sales Report</CardTitle>
                     <CardDescription>
                       {reportData.length} records found
-                      {startDate && endDate && ` for ${startDate} to ${endDate}`}
+                      {startDate && endDate && ` for ${formatDate(startDate)} to ${formatDate(endDate)}`}
                       {customerName && ` for customer: ${customerName}`}
                     </CardDescription>
                   </div>
@@ -286,7 +293,7 @@ const ReportGeneration = () => {
                       <TableBody>
                         {reportData.map((item, idx) => (
                           <TableRow key={idx}>
-                            <TableCell>{item.date}</TableCell>
+                            <TableCell>{formatDate(item.date)}</TableCell>
                             <TableCell>{item.customerName}</TableCell>
                             <TableCell>{item.gstNumber || '-'}</TableCell>
                             <TableCell>{item.invoiceNumber}</TableCell>
