@@ -17,6 +17,8 @@ import RecordPurchasePayment from "./pages/RecordPurchasePayment";
 import ReportGeneration from "./pages/ReportGeneration";
 import Statistics from "./pages/Statistics";
 import NotFound from "./pages/NotFound";
+import SalesReportGeneration from "./pages/SalesReportGeneration";
+import PurchaseReportGeneration from "./pages/PurchaseReportGeneration";
 import { AuthProvider } from "@/pages/AuthContext";
 
 const queryClient = new QueryClient();
@@ -40,6 +42,8 @@ const App = () => (
             <Route path="/add-purchase-entry" element={<AddPurchaseEntry />} />
             <Route path="/record-purchase-payment" element={<RecordPurchasePayment />} />
             <Route path="/report-generation" element={<ReportGeneration />} />
+            <Route path="/SalesReportGeneration" element={<SalesReportGeneration />} />
+            <Route path="/PurchaseReportGeneration" element={<PurchaseReportGeneration />} />
             <Route path="/statistics" element={<Statistics />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
