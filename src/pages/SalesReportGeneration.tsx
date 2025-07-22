@@ -153,7 +153,7 @@ const ReportGeneration = () => {
       ]),
       // ✅ Step 2: Add grand total footer row
       foot: [[
-        '', '', '', 'Grand Total',
+        '', '', '', 'Grand Total', '',
         qtyTotal.toString(),
         totalBeforeGSTSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         cgstSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),

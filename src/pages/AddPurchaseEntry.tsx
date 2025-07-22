@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const AddPurchaseEntry = () => {
   const navigate = useNavigate();
@@ -23,14 +24,21 @@ const AddPurchaseEntry = () => {
   const [gstNumber, setGstNumber] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [hsnCode, setHsnCode] = useState('');
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(0);
   const [amountBeforeTax, setAmountBeforeTax] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [customerOptions, setCustomerOptions] = useState<{ name: string; gstNumber: string }[]>([]);
+  const [gstRate, setGstRate] = useState('5');
+  const [customGstRate, setCustomGstRate] = useState('');
 
-  const cgst = Math.round(amountBeforeTax * 0.025);
-  const sgst = Math.round(amountBeforeTax * 0.025);
+  const [customerOptions, setCustomerOptions] = useState<{ name: string; gstNumber: string }[]>([]);
+  const [purchaseDate, setPurchaseDate] = useState(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return today;
+  });
+  const selectedRate = gstRate === 'other' ? parseFloat(customGstRate) || 0 : parseFloat(gstRate);
+  const cgst = Math.round(amountBeforeTax * (selectedRate / 2) / 100);
+  const sgst = Math.round(amountBeforeTax * (selectedRate / 2) / 100);
   const grandTotal = amountBeforeTax + cgst + sgst;
 
   const handleCustomerSelect = (option: { name: string; gstNumber: string }) => {
@@ -146,7 +154,8 @@ const AddPurchaseEntry = () => {
       totalBeforeGST: amountBeforeTax,
       cgst,
       sgst,
-      grandTotal
+      grandTotal,
+      date: purchaseDate
     };
 
     try {
@@ -178,8 +187,10 @@ const AddPurchaseEntry = () => {
       setGstNumber('');
       setInvoiceNumber('');
       setHsnCode('');
-      setQuantity(1);
+      setQuantity(0);
       setAmountBeforeTax(0);
+      setGstRate('5');
+      setCustomGstRate('');
     } catch (err) {
       toast({
         title: "Error",
@@ -281,6 +292,16 @@ const AddPurchaseEntry = () => {
                     required
                   />
                 </div>
+                <div>
+                  <Label htmlFor="purchaseDate">Date *</Label>
+                  <Input
+                    id="purchaseDate"
+                    type="date"
+                    value={purchaseDate}
+                    onChange={(e) => setPurchaseDate(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -289,9 +310,9 @@ const AddPurchaseEntry = () => {
                   <Input
                     id="quantity"
                     type="number"
-                    min="1"
+                    min="0"
                     value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                    onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
                   />
                 </div>
                 <div>
@@ -307,13 +328,47 @@ const AddPurchaseEntry = () => {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label>GST Rate</Label>
+                <RadioGroup value={gstRate} onValueChange={setGstRate} className="flex gap-4 flex-wrap">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="2.5" id="gst2.5" />
+                    <Label htmlFor="gst2.5">2.5%</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="5" id="gst5" />
+                    <Label htmlFor="gst5">5%</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="9" id="gst9" />
+                    <Label htmlFor="gst9">9%</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="other" id="gstOther" />
+                    <Label htmlFor="gstOther">Other</Label>
+                  </div>
+                  {gstRate === 'other' && (
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      className="w-24"
+                      value={customGstRate}
+                      onChange={(e) => setCustomGstRate(e.target.value)}
+                      placeholder="GST %"
+                    />
+                  )}
+                </RadioGroup>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
                 <div>
-                  <Label>CGST (2.5%)</Label>
+                  <Label>CGST ({(selectedRate / 2).toFixed(2)}%)</Label>
                   <div className="px-3 py-2 bg-gray-100 rounded-md">₹{cgst}</div>
                 </div>
                 <div>
-                  <Label>SGST (2.5%)</Label>
+                  <Label>SGST ({(selectedRate / 2).toFixed(2)}%)</Label>
                   <div className="px-3 py-2 bg-gray-100 rounded-md">₹{sgst}</div>
                 </div>
                 <div>

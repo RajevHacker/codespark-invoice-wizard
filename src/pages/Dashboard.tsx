@@ -50,32 +50,11 @@ const Dashboard = () => {
       path: '/generate-invoice'
     },
     {
-      title: 'Add Customer',
-      description: 'Add new customer information',
-      icon: Users,
-      color: 'bg-blue-500',
-      path: '/add-customer'
-    },
-    {
-      title: 'Add Product',
-      description: 'Add new products to your catalog',
-      icon: Package,
-      color: 'bg-purple-500',
-      path: '/add-product'
-    },
-    {
-      title: 'Update Customer',
-      description: 'Modify existing customer details',
-      icon: Users,
-      color: 'bg-orange-500',
-      path: '/update-customer'
-    },
-    {
-      title: 'Cancel Invoice',
-      description: 'Cancel or void existing invoices',
-      icon: XCircle,
-      color: 'bg-red-500',
-      path: '/cancel-invoice'
+      title: 'Report Generation',
+      description: 'Generate purchase and sales reports',
+      icon: FileBarChart,
+      color: 'bg-cyan-500',
+      path: '/report-generation'
     },
     {
       title: 'Record Payment',
@@ -99,13 +78,33 @@ const Dashboard = () => {
       path: '/record-purchase-payment'
     },
     {
-      title: 'Report Generation',
-      description: 'Generate purchase and sales reports',
-      icon: FileBarChart,
-      color: 'bg-cyan-500',
-      path: '/report-generation'
+      title: 'Cancel Invoice',
+      description: 'Cancel or void existing invoices',
+      icon: XCircle,
+      color: 'bg-red-500',
+      path: '/cancel-invoice'
     },
-    
+    {
+      title: 'Add Customer',
+      description: 'Add new customer information',
+      icon: Users,
+      color: 'bg-blue-500',
+      path: '/add-customer'
+    },
+    {
+      title: 'Add Product',
+      description: 'Add new products to your catalog',
+      icon: Package,
+      color: 'bg-purple-500',
+      path: '/add-product'
+    },
+    {
+      title: 'Update Customer',
+      description: 'Modify existing customer details',
+      icon: Users,
+      color: 'bg-orange-500',
+      path: '/update-customer'
+    },
   ];
 
   return (
