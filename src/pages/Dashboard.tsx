@@ -2,26 +2,36 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
-import { Building2, FileText, Users, Package, CreditCard, BarChart3, XCircle, LogOut, ShoppingCart, Receipt, FileBarChart, TrendingUp } from 'lucide-react';
+import {
+  Building2, FileText, Users, Package, CreditCard, BarChart3, XCircle, LogOut, ShoppingCart, Receipt, FileBarChart, TrendingUp, Loader
+} from 'lucide-react';
+import { useAuth } from "@/pages/AuthContext"; // Assuming useAuth provides token and partnerName
+
+// Define interfaces for the backend response
+interface DuePayment {
+  name: string;
+  amount: number;
+}
+
+interface DashboardSummary {
+  totalOutstanding: number;
+  totalPurchasePaymentPending: number;
+  totOutstandingPayment: DuePayment[];
+  vendorPaymentDues: DuePayment[];
+}
 
 const Dashboard = () => {
   const [businessName, setBusinessName] = useState('');
   const [username, setUsername] = useState('');
+  const [totalOutstanding, setTotalOutstanding] = useState<number | null>(null);
+  const [totalPurchasePaymentPending, setTotalPurchasePaymentPending] = useState<number | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
   const navigate = useNavigate();
-  const salesStats = {
-    totalOutstanding: 125000,
-    totalPaid: 75000,
-    totalInvoices: 45,
-    activeCustomers: 12,
-    averageInvoiceValue: 8500,
-    monthlyGrowth: 15.5
-  };
-  const purchaseStats = {
-    totalPurchases: 580000,
-    totalVendors: 8,
-    averagePurchaseValue: 72500,
-    monthlyPurchaseGrowth: 10.2
-  };
+  const { token, partnerName, logout } = useAuth(); // Get token and partnerName from AuthContext
+
+  // Effect to load user details from localStorage and navigate if not found
   useEffect(() => {
     const storedBusinessName = localStorage.getItem('businessName');
     const storedUsername = localStorage.getItem('username');
@@ -35,9 +45,50 @@ const Dashboard = () => {
     setUsername(storedUsername);
   }, [navigate]);
 
+  // Effect to fetch dashboard summary statistics
+  useEffect(() => {
+    const fetchDashboardSummary = async () => {
+      if (!token || !partnerName) {
+        setStatsError("Authentication details missing. Please log in.");
+        setIsLoadingStats(false);
+        return;
+      }
+
+      setIsLoadingStats(true);
+      setStatsError(null);
+
+      try {
+        const apiUrl = `http://localhost:5062/Invoices/DashBoardSummary?partnerName=${partnerName}`;
+        const response = await fetch(apiUrl, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to fetch dashboard summary: ${response.status} ${errorText}`);
+        }
+
+        const data: DashboardSummary = await response.json();
+        setTotalOutstanding(data.totalOutstanding);
+        setTotalPurchasePaymentPending(data.totalPurchasePaymentPending);
+      } catch (err) {
+        console.error("Error fetching dashboard summary:", err);
+        setStatsError("Failed to load statistics.");
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+
+    // Only fetch if token and partnerName are available
+    if (token && partnerName) {
+      fetchDashboardSummary();
+    }
+  }, [token, partnerName]); // Re-fetch if token or partnerName changes
+
   const handleLogout = () => {
-    localStorage.removeItem('businessName');
-    localStorage.removeItem('username');
+    logout(); // Use the logout function from AuthContext
     navigate('/');
   };
 
@@ -142,31 +193,45 @@ const Dashboard = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Quick Stats */}
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader className="flex items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Outstanding</CardTitle>
-                <TrendingUp className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              ₹{salesStats.totalOutstanding.toLocaleString()}
-            </div>
-              <p className="text-xs text-muted-foreground">Amount pending from customers</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
-              <TrendingUp className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                ₹{purchaseStats.totalPurchases.toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground">Total purchase amount</p>
-            </CardContent>
-          </Card>
+          {isLoadingStats ? (
+            <Card className="col-span-full flex items-center justify-center p-8">
+              <Loader className="h-8 w-8 animate-spin text-blue-500 mr-3" />
+              <p className="text-gray-600">Loading statistics...</p>
+            </Card>
+          ) : statsError ? (
+            <Card className="col-span-full flex items-center justify-center p-8 bg-red-50 border-red-200 text-red-700">
+              <XCircle className="h-8 w-8 mr-3" />
+              <p>{statsError}</p>
+            </Card>
+          ) : (
+            <>
+              <Card>
+                <CardHeader className="flex items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Total Outstanding</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-red-600" />
+                </CardHeader>
+                <CardContent>
+                <div className="text-2xl font-bold text-red-600">
+                  ₹{totalOutstanding !== null ? totalOutstanding.toLocaleString() : 'N/A'}
+                </div>
+                  <p className="text-xs text-muted-foreground">Amount pending from customers</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">
+                    ₹{totalPurchasePaymentPending !== null ? totalPurchasePaymentPending.toLocaleString() : 'N/A'}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total purchase amount</p>
+                </CardContent>
+              </Card>
+            </>
+          )}
           
           <Card className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer"  onClick={() => navigate('/statistics')}>
             <div className="bg-indigo-500 p-3 rounded-lg text-white flex items-center justify-center">
