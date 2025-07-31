@@ -67,7 +67,7 @@ const RecordPayment = () => {
     setIsRecentLoading(true);
     try {
       // API call for recent payment transactions
-      const apiUrl = `http://localhost:5062/Invoices/GetRecentPaymentTransaction?partnerName=${partnerName}&paymentType=Payments`;
+      const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/GetRecentPaymentTransaction?partnerName=${partnerName}&paymentType=Payments`;
       const resp = await fetch(apiUrl, {
         headers: { Authorization: `Bearer ${token}` }
       });

@@ -1,19 +1,19 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react'; // Import useEffect and useRef
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-import { 
-  Card, CardContent, CardDescription, CardHeader, CardTitle 
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import { 
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 
 import { ArrowLeft, FileText, Download } from 'lucide-react';
@@ -45,11 +45,17 @@ const ReportGeneration = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [customerName, setCustomerName] = useState('');
-  
+
+  // New states for suggestion list
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionBoxRef = useRef<HTMLDivElement>(null);
+
   // State for fetched report data and UI control
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [showReport, setShowReport] = useState(false);
   const [loading, setLoading] = useState(false);
+
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, '0');
@@ -57,7 +63,66 @@ const ReportGeneration = () => {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   };
-  
+
+  // --- Suggestion List Logic ---
+  // Debounce for suggestion fetching
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (customerName.length > 1 && token && partnerName) {
+        fetchSuggestions(customerName);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300); // 300ms debounce
+    return () => clearTimeout(handler);
+  }, [customerName, token, partnerName]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (suggestionBoxRef.current && !suggestionBoxRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const fetchSuggestions = async (value: string) => {
+    if (!token || !partnerName) return;
+
+    try {
+      const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(value)}&sheetName=CustomerDetails`;
+      const resp = await fetch(apiUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch suggestions: ${resp.statusText}`);
+      }
+
+      const data: string[] = await resp.json();
+      setSuggestions(data);
+      setShowSuggestions(true);
+    } catch (e) {
+      console.error("Error fetching suggestions:", e);
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    setCustomerName(suggestion);
+    setShowSuggestions(false);
+    // You might want to automatically generate the report here, or leave it for the user to click "Generate Report"
+    // generateReport(); // Uncomment if you want immediate report generation on suggestion selection
+  };
+  // --- End Suggestion List Logic ---
+
+
   // Fetch report data from API based on filters
   const generateReport = async () => {
     if (!reportType) {
@@ -70,6 +135,8 @@ const ReportGeneration = () => {
     }
 
     setLoading(true);
+    setShowSuggestions(false); // Hide suggestions when generating report
+
     try {
       const params = new URLSearchParams({
         startDate: startDate || '',
@@ -80,7 +147,7 @@ const ReportGeneration = () => {
 
       const url = reportType === 'sales'
         ? `https://invoicegenerator-bktt.onrender.com/Invoices/GetSalesList?${params}`
-        : `https://invoicegenerator-bktt.onrender.com/Invoices/GetPurchaseList?${params}`;
+        : `https://invoicegenerator-bktt.onrender.com/Invoices/GetPurchaseList?${params}`; // This part will likely not be hit since reportType is fixed to 'sales'
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
@@ -104,19 +171,19 @@ const ReportGeneration = () => {
   // Export the report data to PDF using jsPDF + autoTable
   const downloadReport = () => {
     const pdf = new jsPDF('p', 'pt', 'a4');
-  
+
     const title = `${partnerName} Sales Report`;
     const dateRange = `${formatDate(startDate) || 'Start'} to ${formatDate(endDate) || 'End'}`;
     const customerFilter = customerName ? ` | Customer: ${customerName}` : '';
     const subTitle = `${reportData.length} records found for ${dateRange}${customerFilter}`;
-  
+
     pdf.setFontSize(18);
     pdf.text(title, 40, 40);
-  
+
     pdf.setFontSize(12);
     pdf.setTextColor(100);
     pdf.text(subTitle, 40, 60);
-  
+
     // ✅ Step 1: Calculate grand totals
     const totalBeforeGSTSum = reportData.reduce((sum, item) => sum + item.totalBeforeGST, 0);
     const cgstSum = reportData.reduce((sum, item) => sum + item.cgst, 0);
@@ -124,7 +191,7 @@ const ReportGeneration = () => {
     const igstSum = reportData.reduce((sum, item) => sum + item.igst, 0);
     const grandTotalSum = reportData.reduce((sum, item) => sum + item.grandTotal, 0);
     const qtyTotal = reportData.reduce((sum, item) => sum + item.qty, 0);
-  
+
     autoTable(pdf, {
       startY: 80,
       head: [[
@@ -153,8 +220,7 @@ const ReportGeneration = () => {
       ]),
       // ✅ Step 2: Add grand total footer row
       foot: [[
-        '', '', '', 'Grand Total', '',
-        qtyTotal.toString(),
+        '', '', '', 'Grand Total', qtyTotal.toString(),
         totalBeforeGSTSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         cgstSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         sgstSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -185,7 +251,7 @@ const ReportGeneration = () => {
         );
       }
     });
-  
+
     pdf.save(`${reportType}-report.pdf`);
   };
 
@@ -196,12 +262,13 @@ const ReportGeneration = () => {
 
   // Reset all filters and clear report data
   const resetFilters = () => {
-    // setReportType('');
     setStartDate('');
     setEndDate('');
     setCustomerName('');
     setReportData([]);
     setShowReport(false);
+    setSuggestions([]); // Clear suggestions on reset
+    setShowSuggestions(false);
   };
 
   return (
@@ -223,10 +290,10 @@ const ReportGeneration = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <Label>Report Type</Label>
-                <Input value="Sales Report" disabled readOnly />
-              </div>
+                <div className="space-y-2">
+                  <Label>Report Type</Label>
+                  <Input value="Sales Report" disabled readOnly />
+                </div>
 
                 <div className="space-y-2">
                   <Label>Start Date</Label>
@@ -238,9 +305,39 @@ const ReportGeneration = () => {
                   <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Customer Name</Label>
-                  <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter customer name" />
+                <div className="space-y-2 relative"> {/* Added relative positioning */}
+                  <Label htmlFor="customerName">Customer Name</Label>
+                  <Input
+                    id="customerName"
+                    value={customerName}
+                    onChange={(e) => {
+                      setCustomerName(e.target.value);
+                      if (e.target.value.length > 0) {
+                        setShowSuggestions(true);
+                      } else {
+                        setShowSuggestions(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (customerName.length > 0) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                    placeholder="Enter customer name"
+                  />
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div ref={suggestionBoxRef} className="absolute z-10 top-full left-0 right-0 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
+                      {suggestions.map((suggestion, index) => (
+                        <div
+                          key={index}
+                          className="px-4 py-2 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSelectSuggestion(suggestion)}
+                        >
+                          {suggestion}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -259,7 +356,7 @@ const ReportGeneration = () => {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <div>
-                  <CardTitle>{partnerName} Sales Report</CardTitle>
+                    <CardTitle>{partnerName} Sales Report</CardTitle>
                     <CardDescription>
                       {reportData.length} records found
                       {startDate && endDate && ` for ${formatDate(startDate)} to ${formatDate(endDate)}`}
@@ -298,11 +395,6 @@ const ReportGeneration = () => {
                             <TableCell>{item.gstNumber || '-'}</TableCell>
                             <TableCell>{item.invoiceNumber}</TableCell>
                             <TableCell>{item.qty}</TableCell>
-                            {/* <TableCell>₹{item.totalBeforeGST.toLocaleString()}</TableCell>
-                            <TableCell>₹{item.cgst.toFixed(2)}</TableCell>
-                            <TableCell>₹{item.sgst.toFixed(2)}</TableCell>
-                            <TableCell>₹{item.igst.toFixed(2)}</TableCell>
-                            <TableCell className="font-semibold">₹{item.grandTotal.toLocaleString()}</TableCell> */}
                             <TableCell>{item.totalBeforeGST.toLocaleString()}</TableCell>
                             <TableCell>{item.cgst.toFixed(2)}</TableCell>
                             <TableCell>{item.sgst.toFixed(2)}</TableCell>

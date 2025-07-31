@@ -70,7 +70,7 @@ const GenerateInvoice = () => {
         return;
       }
       try {
-        const url = `http://localhost:5062/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(trimmedName)}&sheetName=CustomerDetails`;
+        const url = `https://invoicegenerator-bktt.onrender.com/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(trimmedName)}&sheetName=CustomerDetails`;
         const response = await fetch(url, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
@@ -152,7 +152,7 @@ const GenerateInvoice = () => {
       console.log('    --> All product conditions passed. Preparing to make Product API call.');
       try {
         // Use sheetName=Products for product suggestions
-        const url = `http://localhost:5062/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(trimmedProductName)}&sheetName=Products`;
+        const url = `https://invoicegenerator-bktt.onrender.com/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(trimmedProductName)}&sheetName=Products`;
         console.log('    Product API Request URL:', url);
         console.log('    Product API Request Method: GET');
 
@@ -278,7 +278,7 @@ const GenerateInvoice = () => {
 
   const fetchInvoiceNumber = async () => {
     try {
-      const response = await fetch(`http://localhost:5062/Invoices/GetInvoiceNumber?partnerName=${partnerName}`, {
+      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/GetInvoiceNumber?partnerName=${partnerName}`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -411,7 +411,7 @@ const GenerateInvoice = () => {
     try {
       setIsGenerating(true);
       const payload = { ...invoiceData, items };
-      const response = await fetch(`http://localhost:5062/Invoices/InvoiceGenerator?partnerName=${partnerName}`, {
+      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/InvoiceGenerator?partnerName=${partnerName}`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(payload)

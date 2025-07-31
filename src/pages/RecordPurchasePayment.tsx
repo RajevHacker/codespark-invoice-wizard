@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle
 } from "@/components/ui/card";
@@ -36,6 +36,9 @@ const RecordPurchasePayment = () => {
   const { token, partnerName } = useAuth(); // Assuming partnerName is available from useAuth
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [suggestions, setSuggestions] = useState<string[]>([]); // State for suggestions
+  const [showSuggestions, setShowSuggestions] = useState(false); // State to control suggestion visibility
+  const suggestionBoxRef = useRef<HTMLDivElement>(null); // Ref for suggestion box
   const [results, setResults] = useState<PurchaseBalance[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<PurchaseBalance | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -59,7 +62,7 @@ const RecordPurchasePayment = () => {
     try {
       // Construct the API URL for recent transactions
       // Ensure this URL matches your backend endpoint for recent transactions
-      const apiUrl = `http://localhost:5062/Invoices/GetRecentPaymentTransaction?partnerName=${partnerName}&paymentType=PurchasePayment`;
+      const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/GetRecentPaymentTransaction?partnerName=${partnerName}&paymentType=PurchasePayment`;
       const resp = await fetch(apiUrl, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -87,6 +90,56 @@ const RecordPurchasePayment = () => {
     fetchRecentTransactions();
   }, [token, partnerName]); // Re-run when token or partnerName changes
 
+  // Debounce for suggestion fetching
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (searchTerm.length > 1 && token && partnerName) { // Fetch suggestions if searchTerm has at least 2 characters
+        fetchSuggestions(searchTerm);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300); // 300ms debounce
+    return () => clearTimeout(handler);
+  }, [searchTerm, token, partnerName]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (suggestionBoxRef.current && !suggestionBoxRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const fetchSuggestions = async (value: string) => {
+    if (!token || !partnerName) return;
+
+    try {
+      // Construct the API URL for customer search suggestions
+      const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(value)}&sheetName=PurchaseCustomer`;
+      const resp = await fetch(apiUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch suggestions: ${resp.statusText}`);
+      }
+
+      const data: string[] = await resp.json(); // Assuming the API returns an array of strings
+      setSuggestions(data);
+      setShowSuggestions(true);
+    } catch (e) {
+      console.error("Error fetching suggestions:", e);
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
       toast({ title: "Error", description: "Enter customer name", variant: "destructive" });
@@ -99,6 +152,7 @@ const RecordPurchasePayment = () => {
 
     setIsLoading(true);
     setResults([]);
+    setShowSuggestions(false); // Hide suggestions after search
 
     try {
       const resp = await fetch(
@@ -192,6 +246,12 @@ const RecordPurchasePayment = () => {
     }
   };
 
+  const handleSelectSuggestion = (suggestion: string) => {
+    setSearchTerm(suggestion);
+    setShowSuggestions(false);
+    handleSearch(); // Automatically search when a suggestion is selected
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -209,15 +269,43 @@ const RecordPurchasePayment = () => {
             <CardDescription>Find pending purchase invoices</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }} className="flex gap-4 items-center">
+            <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }} className="flex gap-4 items-center relative"> {/* Added relative for positioning suggestions */}
               <Input
                 placeholder="Customer name"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  // Only show suggestions if there's input
+                  if (e.target.value.length > 0) {
+                    setShowSuggestions(true);
+                  } else {
+                    setShowSuggestions(false);
+                  }
+                }}
+                onFocus={() => {
+                  if (searchTerm.length > 0) { // Show suggestions on focus if there's a search term
+                    setShowSuggestions(true);
+                  }
+                }}
+                className="flex-grow"
               />
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? <><Loader className="h-4 w-4 animate-spin mr-2" />Loading</> : <><Search className="h-4 w-4 mr-2" />Search</>}
               </Button>
+
+              {showSuggestions && suggestions.length > 0 && (
+                <div ref={suggestionBoxRef} className="absolute z-10 top-full left-0 right-0 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
+                  {suggestions.map((suggestion, index) => (
+                    <div
+                      key={index}
+                      className="px-4 py-2 cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSelectSuggestion(suggestion)}
+                    >
+                      {suggestion}
+                    </div>
+                  ))}
+                </div>
+              )}
             </form>
           </CardContent>
         </Card>
