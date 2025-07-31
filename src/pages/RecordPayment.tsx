@@ -1,26 +1,99 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"; // Added CardDescription
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "@/components/ui/select"; // Added Select components
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Save } from 'lucide-react';
-import { toast } from "@/hooks/use-toast";
+import { ArrowLeft, CreditCard, Save, Loader } from 'lucide-react'; // Added Loader icon
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
+
+// Interface for the data returned by GetRecentPaymentTransaction API
+interface PaymentReport {
+  customerName: string;
+  date: string; // API returns date as string (e.g., "2025-07-21")
+  amount: number; // API returns amount as number
+}
 
 const RecordPayment = () => {
   const navigate = useNavigate();
-  const { token, partnerName } = useAuth();
+  const { toast } = useToast();
+  const { token, partnerName } = useAuth(); // Assuming partnerName is available from useAuth
 
   const [paymentData, setPaymentData] = useState({
     customerName: '',
-    date: new Date().toISOString().split('T')[0],
-    bankName: '',
+    date: new Date().toISOString().split('T')[0], // Default to current date in YYYY-MM-DD format
+    bankName: '', // This will correspond to paymentMode in the UI
     amount: ''
   });
 
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // New state for recent transactions
+  const [recentTransactions, setRecentTransactions] = useState<PaymentReport[]>([]);
+  const [isRecentLoading, setIsRecentLoading] = useState(false);
+
+  // Helper function to format date to dd-MMM-yyyy
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        return dateString; // Return original string if invalid
+      }
+      // Format as dd-MMM-yyyy
+      return date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return dateString; // Fallback to original string on error
+    }
+  };
+
+  // Function to fetch recent payment transactions
+  const fetchRecentTransactions = async () => {
+    if (!token || !partnerName) {
+      // Don't try to fetch if authentication details are missing
+      return;
+    }
+
+    setIsRecentLoading(true);
+    try {
+      // API call for recent payment transactions
+      const apiUrl = `http://localhost:5062/Invoices/GetRecentPaymentTransaction?partnerName=${partnerName}&paymentType=Payments`;
+      const resp = await fetch(apiUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch recent transactions: ${resp.statusText}`);
+      }
+
+      const data: PaymentReport[] = await resp.json();
+      setRecentTransactions(data);
+    } catch (e) {
+      console.error("Error fetching recent transactions:", e);
+      toast({
+        title: "Error",
+        description: "Unable to fetch recent payment transactions.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRecentLoading(false);
+    }
+  };
+
+  // Effect hook to fetch recent transactions on component mount or auth change
+  useEffect(() => {
+    fetchRecentTransactions();
+  }, [token, partnerName]); // Re-run when token or partnerName changes
 
   const handleInputChange = (field: string, value: string) => {
     setPaymentData({ ...paymentData, [field]: value });
@@ -71,7 +144,7 @@ const RecordPayment = () => {
     }, 300);
 
     return () => clearTimeout(delayDebounce);
-  }, [paymentData.customerName]);
+  }, [paymentData.customerName, token, partnerName]); // Added token, partnerName to dependencies
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +177,7 @@ const RecordPayment = () => {
     }
 
     try {
-      const response = await fetch(`https://invoicegenerator-bktt.onrender.com//Invoices/PaymentEntry?partnerName=${encodeURIComponent(partnerName)}&paymentType=Payments`, {
+      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/PaymentEntry?partnerName=${encodeURIComponent(partnerName)}&paymentType=Payments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -113,7 +186,7 @@ const RecordPayment = () => {
         body: JSON.stringify({
           CustomerName: paymentData.customerName,
           Date: paymentData.date,
-          BankName: paymentData.bankName,
+          BankName: paymentData.bankName, // This maps to your 'BankName' field in the backend
           Amount: paymentData.amount
         })
       });
@@ -125,9 +198,10 @@ const RecordPayment = () => {
 
       toast({
         title: "Success",
-        description: `Payment of ₹${paymentData.amount} recorded successfully for ${paymentData.customerName}!`,
+        description: `Payment of ₹${parseFloat(paymentData.amount).toLocaleString()} recorded successfully for ${paymentData.customerName}!`,
       });
 
+      // Reset form fields after successful submission
       setPaymentData({
         customerName: '',
         date: new Date().toISOString().split('T')[0],
@@ -137,6 +211,7 @@ const RecordPayment = () => {
 
       setCustomerSuggestions([]);
       setShowSuggestions(false);
+      fetchRecentTransactions(); // Re-fetch recent transactions after a successful payment
 
     } catch (error: any) {
       toast({
@@ -167,63 +242,72 @@ const RecordPayment = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="relative">
-                <Label htmlFor="customerName">Customer Name *</Label>
-                <Input
-                  id="customerName"
-                  placeholder="Enter customer name"
-                  value={paymentData.customerName}
-                  onChange={(e) => handleInputChange('customerName', e.target.value)}
-                  required
-                />
-                {showSuggestions && customerSuggestions.length > 0 && (
-                  <ul className="absolute z-10 bg-white border border-gray-300 w-full mt-1 rounded shadow max-h-48 overflow-y-auto">
-                    {customerSuggestions.map((name, index) => (
-                      <li
-                        key={index}
-                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                        onClick={() => handleSuggestionClick(name)}
-                      >
-                        {name}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+              {/* Row 1: Customer Name and Payment Date */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="relative space-y-2">
+                  <Label htmlFor="customerName">Customer Name *</Label>
+                  <Input
+                    id="customerName"
+                    placeholder="Enter customer name"
+                    value={paymentData.customerName}
+                    onChange={(e) => handleInputChange('customerName', e.target.value)}
+                    required
+                  />
+                  {showSuggestions && customerSuggestions.length > 0 && (
+                    <ul className="absolute z-10 bg-white border border-gray-300 w-full mt-1 rounded shadow max-h-48 overflow-y-auto">
+                      {customerSuggestions.map((name, index) => (
+                        <li
+                          key={index}
+                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          onClick={() => handleSuggestionClick(name)}
+                        >
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="date">Payment Date *</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={paymentData.date}
+                    onChange={(e) => handleInputChange('date', e.target.value)}
+                    required
+                  />
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="date">Payment Date *</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={paymentData.date}
-                  onChange={(e) => handleInputChange('date', e.target.value)}
-                  required
-                />
-              </div>
+              {/* Row 2: Payment Mode and Amount */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bankName">Payment Mode *</Label>
+                  <Select value={paymentData.bankName} onValueChange={(value) => handleInputChange('bankName', value)} required>
+                    <SelectTrigger id="bankName"><SelectValue placeholder="Select mode" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Cheque">Cheque</SelectItem>
+                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="UPI">UPI</SelectItem>
+                      <SelectItem value="Card">Card</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div>
-                <Label htmlFor="bankName">Bank Name *</Label>
-                <Input
-                  id="bankName"
-                  placeholder="Enter bank name"
-                  value={paymentData.bankName}
-                  onChange={(e) => handleInputChange('bankName', e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="amount">Amount (₹) *</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  placeholder="Enter payment amount"
-                  value={paymentData.amount}
-                  onChange={(e) => handleInputChange('amount', e.target.value)}
-                  required
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Amount (₹) *</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    placeholder="Enter payment amount"
+                    value={paymentData.amount}
+                    onChange={(e) => handleInputChange('amount', e.target.value)}
+                    required
+                  />
+                </div>
               </div>
 
               <div className="flex gap-4 pt-4">
@@ -240,6 +324,45 @@ const RecordPayment = () => {
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* --- Recent Transactions Table --- */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Recent Payment Transactions</CardTitle>
+            <CardDescription>Last 10 payments recorded</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isRecentLoading ? (
+              <div className="flex justify-center items-center h-24">
+                <Loader className="h-8 w-8 animate-spin text-blue-500" />
+                <span className="ml-2 text-gray-600">Loading recent transactions...</span>
+              </div>
+            ) : recentTransactions.length === 0 ? (
+              <p className="text-center text-gray-500">No recent transactions found.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border text-sm text-left">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="border px-4 py-2">Customer Name</th>
+                      <th className="border px-4 py-2">Date</th>
+                      <th className="border px-4 py-2">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentTransactions.map((transaction, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="border px-4 py-2">{transaction.customerName}</td>
+                        <td className="border px-4 py-2">{formatDate(transaction.date)}</td>
+                        <td className="border px-4 py-2">₹{transaction.amount.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

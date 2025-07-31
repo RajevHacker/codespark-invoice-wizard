@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle
 } from "@/components/ui/card";
@@ -14,6 +14,13 @@ import { ArrowLeft, Search, Loader } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
 
+// Updated PaymentReport interface to match the JSON keys from your C# API
+interface PaymentReport {
+  customerName: string;
+  date: string; // Keeping as string as per your API response example
+  amount: number; // Keeping as number as per your API response example
+}
+
 interface PurchaseBalance {
   invoiceNumber: string;
   customerName: string;
@@ -26,7 +33,7 @@ interface PurchaseBalance {
 const RecordPurchasePayment = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { token, partnerName } = useAuth();
+  const { token, partnerName } = useAuth(); // Assuming partnerName is available from useAuth
 
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<PurchaseBalance[]>([]);
@@ -36,6 +43,49 @@ const RecordPurchasePayment = () => {
   const [paymentMode, setPaymentMode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // New state for recent transactions
+  const [recentTransactions, setRecentTransactions] = useState<PaymentReport[]>([]);
+  const [isRecentLoading, setIsRecentLoading] = useState(false);
+
+  // Function to fetch recent payment transactions
+  const fetchRecentTransactions = async () => {
+    if (!token || !partnerName) {
+      // Don't try to fetch if authentication details are missing
+      return;
+    }
+
+    setIsRecentLoading(true);
+    try {
+      // Construct the API URL for recent transactions
+      // Ensure this URL matches your backend endpoint for recent transactions
+      const apiUrl = `http://localhost:5062/Invoices/GetRecentPaymentTransaction?partnerName=${partnerName}&paymentType=PurchasePayment`;
+      const resp = await fetch(apiUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch recent transactions: ${resp.statusText}`);
+      }
+
+      const data: PaymentReport[] = await resp.json();
+      setRecentTransactions(data);
+    } catch (e) {
+      console.error("Error fetching recent transactions:", e);
+      toast({
+        title: "Error",
+        description: "Unable to fetch recent payment transactions.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRecentLoading(false);
+    }
+  };
+
+  // useEffect to fetch recent transactions on component mount or auth change
+  useEffect(() => {
+    fetchRecentTransactions();
+  }, [token, partnerName]); // Re-run when token or partnerName changes
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
@@ -89,7 +139,7 @@ const RecordPurchasePayment = () => {
     const payload = {
       CustomerName: selectedSupplier.customerName,
       Date: paymentDate,
-      BankName: paymentMode,
+      BankName: paymentMode, // This seems to be used as payment mode, adjust if your backend expects 'PaymentMode'
       Amount: paymentAmount
     };
 
@@ -113,11 +163,32 @@ const RecordPurchasePayment = () => {
       setPaymentMode('');
       setSearchTerm('');
       setResults([]);
+      fetchRecentTransactions(); // Re-fetch recent transactions after a successful payment
     } catch (e) {
       console.error(e);
       toast({ title: "Error", description: "Payment record failed", variant: "destructive" });
     } finally {
       setShowConfirmModal(false);
+    }
+  };
+
+  // Helper function to format date
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        return dateString; // Return original string if invalid
+      }
+      // Format as dd-MMM-yyyy
+      return date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return dateString; // Fallback to original string on error
     }
   };
 
@@ -158,25 +229,25 @@ const RecordPurchasePayment = () => {
               <table className="min-w-full border text-sm text-left">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="border px-4">Customer</th>
-                    <th className="border px-4">Date</th>
-                    <th className="border px-4">Invoice</th>
-                    <th className="border px-4">Total</th>
-                    <th className="border px-4">Balance</th>
-                    <th className="border px-4">Status</th>
-                    <th className="border px-4">Action</th>
+                    <th className="border px-4 py-2">Customer</th>
+                    <th className="border px-4 py-2">Date</th>
+                    <th className="border px-4 py-2">Invoice</th>
+                    <th className="border px-4 py-2">Total</th>
+                    <th className="border px-4 py-2">Balance</th>
+                    <th className="border px-4 py-2">Status</th>
+                    <th className="border px-4 py-2">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {results.map((r) => (
                     <tr key={r.invoiceNumber} className="hover:bg-gray-50">
-                      <td className="border px-4">{r.customerName}</td>
-                      <td className="border px-4">{r.date || '-'}</td>
-                      <td className="border px-4">{r.invoiceNumber}</td>
-                      <td className="border px-4">₹{r.grandTotal.toLocaleString()}</td>
-                      <td className="border px-4 text-red-600">₹{r.balanceAmount.toLocaleString()}</td>
-                      <td className="border px-4">{r.paymentStatus}</td>
-                      <td className="border px-4">
+                      <td className="border px-4 py-2">{r.customerName}</td>
+                      <td className="border px-4 py-2">{r.date || '-'}</td>
+                      <td className="border px-4 py-2">{r.invoiceNumber}</td>
+                      <td className="border px-4 py-2">₹{r.grandTotal.toLocaleString()}</td>
+                      <td className="border px-4 py-2 text-red-600">₹{r.balanceAmount.toLocaleString()}</td>
+                      <td className="border px-4 py-2">{r.paymentStatus}</td>
+                      <td className="border px-4 py-2">
                         <Button variant="secondary" onClick={() => setSelectedSupplier(r)}>
                           Record
                         </Button>
@@ -267,6 +338,46 @@ const RecordPurchasePayment = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* --- Recent Transactions Table --- */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Recent Payment Transactions</CardTitle>
+            <CardDescription>Last 10 payments recorded</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isRecentLoading ? (
+              <div className="flex justify-center items-center h-24">
+                <Loader className="h-8 w-8 animate-spin text-blue-500" />
+                <span className="ml-2 text-gray-600">Loading recent transactions...</span>
+              </div>
+            ) : recentTransactions.length === 0 ? (
+              <p className="text-center text-gray-500">No recent transactions found.</p>
+            ) : (
+              <div className="overflow-x-auto"> {/* Added for horizontal scrolling on small screens */}
+                <table className="min-w-full border text-sm text-left">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="border px-4 py-2">Customer Name</th>
+                      <th className="border px-4 py-2">Date</th>
+                      <th className="border px-4 py-2">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentTransactions.map((transaction, index) => (
+                      <tr key={index} className="hover:bg-gray-50"> {/* Using index as key, consider a unique ID if available */}
+                        <td className="border px-4 py-2">{transaction.customerName}</td>
+                        {/* Format the date here */}
+                        <td className="border px-4 py-2">{formatDate(transaction.date)}</td>
+                        <td className="border px-4 py-2">₹{transaction.amount.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
