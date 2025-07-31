@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/pages/AuthContext"; // Ensure this path is correct
+import { useAuth } from "@/pages/AuthContext";
 
 interface ProductItem {
   sNo: number;
@@ -18,12 +18,28 @@ interface ProductItem {
 
 const GenerateInvoice = () => {
   const navigate = useNavigate();
-  const { token, partnerName } = useAuth(); // Destructure token and partnerName
+  const { token, partnerName } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // State for Customer Suggestions
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   
-  const inputRef = useRef<HTMLDivElement>(null);
+  // State for Product Suggestions
+  const [productSuggestions, setProductSuggestions] = useState<string[]>([]);
+  // activeProductInputIndex tracks which product input is currently focused,
+  // allowing suggestions to appear only for that specific input.
+  const [activeProductInputIndex, setActiveProductInputIndex] = useState<number | null>(null);
+  // New state to store the position and dimensions of the active product input
+  const [suggestionBoxPosition, setSuggestionBoxPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+
+
+  // Refs for managing focus and click-outside for suggestion lists
+  const customerInputRef = useRef<HTMLDivElement>(null);
+  // Using a Map for refs is robust for dynamic lists where items can be added/removed,
+  // ensuring each input has a unique, retrievable reference.
+  const productInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+
 
   const [invoiceData, setInvoiceData] = useState({
     invoiceNumber: '',
@@ -39,84 +55,135 @@ const GenerateInvoice = () => {
 
   // Debug: Log initial token and partnerName from useAuth
   useEffect(() => {
-    console.log('Auth Context State (on mount):');
+    console.log('--- Auth Context State (on mount) ---');
     console.log('  Token:', token ? 'Present' : 'Missing');
     console.log('  Partner Name:', partnerName ? partnerName : 'Missing');
-  }, [token, partnerName]); // Run once when token/partnerName are initially set
+  }, [token, partnerName]);
 
-  // Fetch customer suggestions when invoiceData.name changes and length >= 2
+  // --- Customer Suggestions Logic ---
   useEffect(() => {
-    console.log('*** useEffect for suggestions triggered ***');
-    console.log('  Current invoiceData.name:', invoiceData.name);
-    console.log('  Current token (inside effect):', token ? 'Present' : 'Missing');
-    console.log('  Current partnerName (inside effect):', partnerName ? partnerName : 'Missing');
-
-    const fetchSuggestions = async () => {
-      console.log('--> fetchSuggestions function started.');
+    const fetchCustomerSuggestions = async () => {
       const trimmedName = invoiceData.name.trim();
-      console.log('    trimmedName for search:', `"${trimmedName}"`, 'Length:', trimmedName.length);
-
-      if (trimmedName.length < 2) {
-        console.log('    --> CONDITION MET: Name too short for suggestions. Clearing suggestions.');
+      if (trimmedName.length < 2 || !token || !partnerName) {
         setCustomerSuggestions([]);
-        setShowSuggestions(false);
-        return; // Exit if condition met
+        setShowCustomerSuggestions(false);
+        return;
+      }
+      try {
+        const url = `http://localhost:5062/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(trimmedName)}&sheetName=CustomerDetails`;
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('API Error: Failed to fetch customer suggestions:', response.status, errorText);
+          toast({ title: "Suggestion Error", description: `Could not fetch customer suggestions: ${response.statusText}`, variant: "destructive" });
+          setCustomerSuggestions([]);
+          setShowCustomerSuggestions(false);
+          return;
+        }
+        const suggestions: string[] = await response.json();
+        setCustomerSuggestions(suggestions);
+        setShowCustomerSuggestions(suggestions.length > 0);
+      } catch (error) {
+        console.error("Fetch Error: Error fetching customer suggestions:", error);
+        toast({ title: "Network Error", description: `Failed to connect to customer suggestion service.`, variant: "destructive" });
+        setCustomerSuggestions([]);
+        setShowCustomerSuggestions(false);
+      }
+    };
+    const handler = setTimeout(() => {
+      fetchCustomerSuggestions();
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [invoiceData.name, partnerName, token]);
+
+  const handleCustomerSuggestionClick = (name: string) => {
+    setInvoiceData((prev) => ({ ...prev, name }));
+    setShowCustomerSuggestions(false);
+    // Re-focus the customer input after selection
+    setTimeout(() => { customerInputRef.current?.querySelector('input')?.focus(); }, 0);
+  };
+
+  // Effect to handle clicking outside the customer input/suggestions to close them
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (customerInputRef.current && !customerInputRef.current.contains(event.target as Node)) {
+        setShowCustomerSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // --- Product Suggestions Logic ---
+  useEffect(() => {
+    console.log('--- Product Suggestions useEffect triggered ---');
+    console.log('  Current activeProductInputIndex:', activeProductInputIndex);
+
+    const fetchProductSuggestions = async () => {
+      console.log('--> fetchProductSuggestions function started.');
+      
+      // If no product input is active, or the product name is too short, or auth details are missing,
+      // clear suggestions and return early.
+      if (activeProductInputIndex === null) {
+        console.log('    CONDITION NOT MET: No active product input index. Returning.');
+        setProductSuggestions([]);
+        return; 
+      }
+
+      const currentProductItem = items[activeProductInputIndex];
+      const trimmedProductName = currentProductItem?.productName.trim() || '';
+      console.log(`    Processing for index ${activeProductInputIndex}. Product Name: "${trimmedProductName}", Length: ${trimmedProductName.length}`);
+
+      if (trimmedProductName.length < 2) {
+        console.log('    --> CONDITION MET: Product name too short (< 2 chars). Clearing product suggestions.');
+        setProductSuggestions([]);
+        return;
       }
 
       if (!token || !partnerName) {
-        console.log('    --> CONDITION MET: Auth token or partner name missing. Cannot fetch suggestions.');
-        setCustomerSuggestions([]);
-        setShowSuggestions(false);
-        return; // Exit if condition met
+        console.log('    --> CONDITION MET: Auth token or partner name missing. Cannot fetch product suggestions.');
+        setProductSuggestions([]);
+        return;
       }
 
-      // If we reach here, conditions are met, proceed with fetch
-      console.log('    --> All conditions passed. Preparing to make API call.');
+      console.log('    --> All product conditions passed. Preparing to make Product API call.');
       try {
-        const url = `http://localhost:5062/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(trimmedName)}&sheetName=CustomerDetails`;
-        console.log('    API Request URL:', url);
-        console.log('    API Request Method: GET');
-        console.log('    API Request Headers (Authorization): Bearer ...');
+        // Use sheetName=Products for product suggestions
+        const url = `http://localhost:5062/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(trimmedProductName)}&sheetName=Products`;
+        console.log('    Product API Request URL:', url);
+        console.log('    Product API Request Method: GET');
 
         const response = await fetch(url, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
           },
-          // body: '', // For GET requests, 'body' property is typically ignored and can be removed for clarity
         });
 
-        console.log('    <-- Fetch response received.');
-        console.log('    Response status:', response.status);
-        console.log('    Response ok:', response.ok);
-        
-        // Log all response headers to debug CORS
-        console.log('    Response Headers:');
-        for (let pair of response.headers.entries()) {
-          console.log(`      ${pair[0]}: ${pair[1]}`);
-        }
+        console.log('    <-- Product Fetch response received.');
+        console.log('    Product Response status:', response.status);
+        console.log('    Product Response ok:', response.ok);
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('    API Error: Failed to fetch customer suggestions:', response.status, errorText);
+          console.error('API Error: Failed to fetch product suggestions:', response.status, errorText);
           toast({
-            title: "Suggestion Error",
-            description: `Could not fetch customer suggestions: ${response.statusText}. Details: ${errorText.substring(0, 100)}`,
+            title: "Product Suggestion Error",
+            description: `Could not fetch product suggestions: ${response.statusText}. Details: ${errorText.substring(0, 100)}`,
             variant: "destructive"
           });
-          setCustomerSuggestions([]);
-          setShowSuggestions(false);
+          setProductSuggestions([]);
           return;
         }
 
         const suggestions: string[] = await response.json();
-        console.log('    Received suggestions:', suggestions);
-        
-        setCustomerSuggestions(suggestions);
-        setShowSuggestions(suggestions.length > 0);
+        console.log('    Received product suggestions:', suggestions);
+        setProductSuggestions(suggestions);
       } catch (error) {
-        // This 'catch' block means the fetch *itself* failed (e.g., network down, CORS blocked response)
-        console.error("    <-- Fetch Error: Error fetching customer suggestions (caught):", error);
+        console.error("    <-- Fetch Error: Error fetching product suggestions (caught):", error);
         if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
             console.error("    Likely cause: CORS issue or actual network unavailability (e.g., backend not running).");
         } else {
@@ -124,81 +191,111 @@ const GenerateInvoice = () => {
         }
         toast({
           title: "Network Error",
-          description: `Failed to connect to suggestion service. Check browser console for network/CORS errors.`,
+          description: `Failed to connect to product suggestion service. Check browser console.`,
           variant: "destructive"
         });
-        setCustomerSuggestions([]);
-        setShowSuggestions(false);
+        setProductSuggestions([]);
       }
     };
 
-    // Debounce: Prevents immediate calls on every keystroke
-    console.log('  Setting up debounce timeout...');
-    const handler = setTimeout(() => {
-      console.log('  --> Debounce finished. Calling fetchSuggestions.');
-      fetchSuggestions();
-    }, 300);
+    // Debounce the API call for product suggestions
+    // Only fetch if an input is active and the product name has at least 2 characters
+    if (activeProductInputIndex !== null && items[activeProductInputIndex]?.productName.trim().length >= 2) {
+        console.log('  Setting up debounce timeout for product suggestions...');
+        const handler = setTimeout(() => {
+          console.log('  --> Product Debounce finished. Calling fetchProductSuggestions.');
+          fetchProductSuggestions();
+        }, 300);
 
-    return () => {
-      console.log('  <-- Cleaning up previous debounce timeout.');
-      clearTimeout(handler); // Cleanup the timeout on re-render or unmount
-    };
-  }, [invoiceData.name, partnerName, token]); // Dependencies that trigger this useEffect
+        return () => {
+          console.log('  <-- Cleaning up previous debounce timeout for product suggestions.');
+          clearTimeout(handler);
+        };
+    } else {
+        // If conditions are not met, clear suggestions immediately
+        console.log('  Product suggestions conditions not met (activeInputIndex is null or name too short). Clearing suggestions.');
+        setProductSuggestions([]);
+    }
+  }, [items, activeProductInputIndex, partnerName, token]); // `items` as a whole array is a dependency for product name changes
 
-  // Handle clicking a suggestion from dropdown
-  const handleSuggestionClick = (name: string) => {
-    console.log('Suggestion clicked:', name);
-    setInvoiceData((prev) => ({ ...prev, name }));
-    setShowSuggestions(false); // Hide suggestions immediately
-    // Re-focus the input after setting the name
-    setTimeout(() => {
-      inputRef.current?.querySelector('input')?.focus();
-    }, 0); 
+  // Handle clicking a product suggestion
+  const handleProductSuggestionClick = (suggestion: string) => {
+    console.log('Product suggestion clicked:', suggestion, 'for index:', activeProductInputIndex);
+    if (activeProductInputIndex !== null) {
+      updateItem(activeProductInputIndex, 'productName', suggestion);
+      setProductSuggestions([]); // Clear suggestions after selection
+      setActiveProductInputIndex(null); // Deactivate this input after selection
+      setSuggestionBoxPosition(null); // Hide the suggestion box
+      // Re-focus the input after setting the value
+      setTimeout(() => {
+        productInputRefs.current.get(activeProductInputIndex)?.focus();
+      }, 0);
+    }
   };
 
-  // Close suggestion dropdown if clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
-        console.log('Clicked outside of input/suggestions, hiding suggestions.');
-        setShowSuggestions(false);
+  // Focus handler for product name inputs
+  const handleProductInputFocus = (event: React.FocusEvent<HTMLInputElement>, index: number) => {
+    console.log(`Product input ${index} focused. Setting activeProductInputIndex to ${index}.`);
+    setActiveProductInputIndex(index); // Set the active index
+
+    // Capture the position and width of the focused input to position the suggestion box
+    const rect = event.currentTarget.getBoundingClientRect();
+    setSuggestionBoxPosition({
+      top: rect.top + window.scrollY, // Use window.scrollY for absolute positioning
+      left: rect.left + window.scrollX, // Use window.scrollX for absolute positioning
+      width: rect.width,
+    });
+  };
+
+  // Blur handler for product name inputs
+  const handleProductInputBlur = (event: React.FocusEvent, index: number) => {
+    console.log(`Product input ${index} blurred.`);
+    
+    // Check if the focus moved to an element that is part of the suggestion list
+    // This is crucial to prevent suggestions from disappearing when a user clicks on a suggestion.
+    const relatedTarget = event.relatedTarget as HTMLElement;
+    // We can't use nextElementSibling reliably here since the suggestion list is now outside the table.
+    // Instead, we check if the relatedTarget is within the suggestion list itself.
+    const suggestionListElement = document.getElementById('product-suggestions-list'); // Give the ul an ID
+
+    // Use a timeout to allow the click on a suggestion to register before the blur logic.
+    // A click on a suggestion will trigger the input's blur event first.
+    setTimeout(() => {
+      console.log(`  Blur timeout for index ${index} triggered.`);
+      if (suggestionListElement && relatedTarget && suggestionListElement.contains(relatedTarget)) {
+          console.log(`  Blur from input ${index} due to click on suggestion. Retaining active and suggestions.`);
+          // If we clicked a suggestion, the click handler will handle updating the value and clearing suggestions.
+          return; 
       }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+
+      // If focus moved elsewhere (not a suggestion), hide suggestions and deactivate
+      console.log(`  Blur from input ${index} not on suggestion. Hiding suggestions, deactivating index.`);
+      setProductSuggestions([]); // Clear suggestions
+      setActiveProductInputIndex(null); // Deactivate this input
+      setSuggestionBoxPosition(null); // Hide the suggestion box
+    }, 100); // Small delay to allow click event to propagate
+  };
 
   const fetchInvoiceNumber = async () => {
-    console.log('Fetching invoice number...');
     try {
       const response = await fetch(`http://localhost:5062/Invoices/GetInvoiceNumber?partnerName=${partnerName}`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-  
       if (!response.ok) {
         const errorText = await response.text();
         console.error('API Error: Failed to fetch invoice number:', response.status, errorText);
         throw new Error(`Failed to fetch invoice number: ${response.statusText}`);
       }
-  
       const rawText = await response.text();
       const invoiceNumber = rawText.replace(/"/g, ''); 
-      
       if (!invoiceNumber || invoiceNumber.trim() === '') {
         console.warn("Received empty or invalid invoice number from API.");
         return '';
       }
-      console.log('Fetched Invoice Number:', invoiceNumber);
       return invoiceNumber;
     } catch (error) {
-      toast({
-        title: "Error",
-        description: (error as Error).message,
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: (error as Error).message, variant: "destructive" });
       console.error("Fetch Error: Error in fetchInvoiceNumber:", error);
       return '';
     }
@@ -206,51 +303,87 @@ const GenerateInvoice = () => {
 
   useEffect(() => {
     const loadInvoiceNumber = async () => {
-      console.log('Loading initial invoice number...');
       if (token && partnerName) {
         const invNum = await fetchInvoiceNumber();
         if (invNum) {
           setInvoiceData(prev => ({ ...prev, invoiceNumber: invNum }));
         }
-      } else {
-        console.log('Skipping initial invoice number load: token or partnerName missing.');
       }
     };
-
     loadInvoiceNumber();
-  }, [token, partnerName]); // Depend on token and partnerName for initial load
+  }, [token, partnerName]);
 
   const addItem = () => {
-    setItems([...items, {
-      sNo: items.length + 1,
-      productName: '',
-      hsn: '',
-      qty: 1,
-      price: 0
-    }]);
+    setItems(currentItems => {
+      const newItems = [...currentItems, {
+        sNo: currentItems.length + 1,
+        productName: '',
+        hsn: '',
+        qty: 1,
+        price: 0
+      }];
+      return newItems;
+    });
+    // After adding an item, you might want to focus the new product name input.
+    // This will implicitly trigger the focus handler and potentially suggestions.
+    // We need to wait for React to render the new input element before trying to focus it.
+    setTimeout(() => {
+      const newIndex = items.length; // The index of the newly added item
+      productInputRefs.current.get(newIndex)?.focus();
+    }, 0);
   };
 
   const removeItem = (index: number) => {
     if (items.length > 1) {
-      const newItems = items.filter((_, i) => i !== index);
-      const renumberedItems = newItems.map((item, i) => ({ ...item, sNo: i + 1 }));
-      setItems(renumberedItems);
+      setItems(currentItems => {
+        const newItems = currentItems.filter((_, i) => i !== index);
+        const renumberedItems = newItems.map((item, i) => ({ ...item, sNo: i + 1 }));
+        return renumberedItems;
+      });
+      // Remove the corresponding ref from the Map
+      productInputRefs.current.delete(index);
+      // Adjust remaining indices in the map if needed (important for re-using refs for re-indexed items)
+      const newRefs = new Map<number, HTMLInputElement>();
+      productInputRefs.current.forEach((value, key) => {
+          if (key < index) {
+              newRefs.set(key, value);
+          } else if (key > index) {
+              newRefs.set(key - 1, value); // Shift index down
+          }
+      });
+      productInputRefs.current = newRefs;
+
+      // Clear product suggestions and deactivate if the removed item was active
+      if (activeProductInputIndex === index) {
+          setProductSuggestions([]);
+          setActiveProductInputIndex(null);
+          setSuggestionBoxPosition(null); // Hide the suggestion box
+      } else if (activeProductInputIndex !== null && activeProductInputIndex > index) {
+          // Adjust active index if an earlier item was removed
+          setActiveProductInputIndex(prev => (prev !== null ? prev - 1 : null));
+      }
     } else {
-      // Clear the last item's fields instead of removing it entirely if only one exists
+      // If only one item remains, reset its fields instead of removing it entirely
       setItems([{ sNo: 1, productName: '', hsn: '', qty: 1, price: 0 }]);
+      productInputRefs.current.clear(); // Clear all product refs if the list is reset
+      setProductSuggestions([]);
+      setActiveProductInputIndex(null);
+      setSuggestionBoxPosition(null); // Hide the suggestion box
     }
   };
 
   const updateItem = (index: number, field: keyof ProductItem, value: string | number) => {
-    const newItems = [...items];
-    if (field === 'qty' || field === 'price') {
-      value = Number(value);
-      if (isNaN(value)) {
-        value = 0; 
+    setItems(currentItems => {
+      const newItems = [...currentItems];
+      if (field === 'qty' || field === 'price') {
+        value = Number(value);
+        if (isNaN(value)) {
+          value = 0; 
+        }
       }
-    }
-    newItems[index] = { ...newItems[index], [field]: value };
-    setItems(newItems);
+      newItems[index] = { ...newItems[index], [field]: value };
+      return newItems;
+    });
   };
 
   const calculateSubtotal = () => {
@@ -262,50 +395,25 @@ const GenerateInvoice = () => {
   };
 
   const handleGenerateInvoice = async () => {
-    console.log('Attempting to generate invoice...');
     if (!invoiceData.name.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Customer Name is required.",
-        variant: "destructive"
-      });
-      console.log('Validation failed: Customer Name empty.');
+      toast({ title: "Validation Error", description: "Customer Name is required.", variant: "destructive" });
       return;
     }
     if (items.some(item => !item.productName.trim())) {
-      toast({
-        title: "Validation Error",
-        description: "All product names are required.",
-        variant: "destructive"
-      });
-      console.log('Validation failed: Product name empty.');
+      toast({ title: "Validation Error", description: "All product names are required.", variant: "destructive" });
       return;
     }
     if (items.some(item => item.qty <= 0 || item.price < 0)) {
-      toast({
-        title: "Validation Error",
-        description: "Quantity must be greater than 0 and price cannot be negative.",
-        variant: "destructive"
-      });
-      console.log('Validation failed: Quantity/Price invalid.');
+      toast({ title: "Validation Error", description: "Quantity must be greater than 0 and price cannot be negative.", variant: "destructive" });
       return;
     }
 
     try {
       setIsGenerating(true);
-
-      const payload = {
-        ...invoiceData,
-        items,
-      };
-      console.log('Invoice payload:', payload);
-      
+      const payload = { ...invoiceData, items };
       const response = await fetch(`http://localhost:5062/Invoices/InvoiceGenerator?partnerName=${partnerName}`, {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 
@@ -316,21 +424,13 @@ const GenerateInvoice = () => {
       }
 
       const result = await response.json();
-      console.log('Invoice generation result:', result);
-
       if (result.fileUrl) {
         window.open(result.fileUrl, '_blank');
       }
 
-      toast({
-        title: `Invoice ${result.invoiceNumber || 'Generated'}`,
-        description: result.fileUrl ? `Invoice PDF opened in new tab.` : `Invoice data processed.`,
-        duration: 7000,
-      });
+      toast({ title: `Invoice ${result.invoiceNumber || 'Generated'}`, description: result.fileUrl ? `Invoice PDF opened in new tab.` : `Invoice data processed.`, duration: 7000 });
 
-      const nextInvNum = await fetchInvoiceNumber(); // Fetch new invoice number
-      console.log('Next Invoice Number:', nextInvNum);
-
+      const nextInvNum = await fetchInvoiceNumber();
       setInvoiceData({
         invoiceNumber: nextInvNum || '',
         name: '',
@@ -338,16 +438,11 @@ const GenerateInvoice = () => {
         noOfBales: 0,
         transport: '',
       });
-
       setItems([{ sNo: 1, productName: '', hsn: '', qty: 1, price: 0 }]);
 
     } catch (error) {
-      toast({
-        title: "Error Generating Invoice",
-        description: (error as Error).message,
-        variant: "destructive"
-      });
-      console.error("Generate Invoice Error (caught):", error);
+      toast({ title: "Error Generating Invoice", description: (error as Error).message, variant: "destructive" });
+      console.error("Generate Invoice Error:", error);
     } finally {
       setIsGenerating(false);
     }
@@ -411,29 +506,44 @@ const GenerateInvoice = () => {
               </div>
               <div>
                 <Label htmlFor="customerName">Customer Name *</Label>
-                <div className="relative" ref={inputRef}>
+                <div className="relative" ref={customerInputRef}>
                   <Input
                     id="customerName"
                     placeholder="Enter customer name"
                     value={invoiceData.name}
                     onChange={(e) => {
-                      console.log('Customer name input changed:', e.target.value); // Debug: Input change
                       setInvoiceData({ ...invoiceData, name: e.target.value });
+                      // Show suggestions if input length is >= 2, otherwise hide
                       if (e.target.value.trim().length >= 2) {
-                          setShowSuggestions(true); 
+                          setShowCustomerSuggestions(true); 
                       } else {
-                          setShowSuggestions(false);
+                          setShowCustomerSuggestions(false);
                       }
+                    }}
+                    onFocus={() => {
+                        // Show suggestions on focus if there's already enough text
+                        if (invoiceData.name.trim().length >= 2) {
+                            setShowCustomerSuggestions(true);
+                        }
+                    }}
+                    onBlur={(e) => {
+                        // Use a timeout to allow a click on a suggestion to register
+                        setTimeout(() => {
+                            if (!customerInputRef.current?.contains(e.relatedTarget as Node)) {
+                                setShowCustomerSuggestions(false);
+                            }
+                        }, 100);
                     }}
                     autoComplete="off"
                   />
-                  {showSuggestions && (customerSuggestions.length > 0 || invoiceData.name.trim().length >= 2) && (
+                  {showCustomerSuggestions && (customerSuggestions.length > 0 || invoiceData.name.trim().length >= 2) && (
                     <ul className="absolute z-50 bg-white border rounded-md max-h-48 overflow-y-auto w-full mt-1 shadow-lg">
                       {customerSuggestions.length > 0 ? (
                         customerSuggestions.map((name, idx) => (
                           <li
                             key={idx}
-                            onClick={() => handleSuggestionClick(name)}
+                            onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking suggestion
+                            onClick={() => handleCustomerSuggestionClick(name)}
                             className="cursor-pointer px-3 py-1 hover:bg-gray-100"
                           >
                             {name}
@@ -482,7 +592,7 @@ const GenerateInvoice = () => {
                   <tr>
                     <th className="border border-gray-300 px-2 py-1 text-sm">SNo</th>
                     <th className="border border-gray-300 px-2 py-1 text-sm">Product Name *</th>
-                    <th className="border border-gray-300 px-2 py-1 text-sm">HSN Code</th>
+                    {/* <th className="border border-gray-300 px-2 py-1 text-sm">HSN Code</th> */}
                     <th className="border border-gray-300 px-2 py-1 text-sm">QTY</th>
                     <th className="border border-gray-300 px-2 py-1 text-sm">Amount</th>
                     <th className="border border-gray-300 px-2 py-1 text-sm">Total</th>
@@ -493,21 +603,30 @@ const GenerateInvoice = () => {
                   {items.map((item, index) => (
                     <tr key={item.sNo}>
                       <td className="border border-gray-300 text-center px-2 py-1 text-sm">{item.sNo}</td>
-                      <td className="border border-gray-300 px-2 py-1">
+                      <td className="border border-gray-300 px-2 py-1 relative">
                         <Input
                           value={item.productName}
                           onChange={(e) => updateItem(index, 'productName', e.target.value)}
+                          onFocus={(e) => handleProductInputFocus(e, index)} // Pass event to capture position
+                          onBlur={(e) => handleProductInputBlur(e, index)} // Handle blur for product inputs
+                          // Store ref in the Map using the item's index as key
+                          ref={(el) => {
+                            if (el) productInputRefs.current.set(index, el);
+                            else productInputRefs.current.delete(index); // Clean up ref on unmount
+                          }}
                           required
                           className="w-full"
+                          autoComplete="off"
                         />
+                        {/* The product suggestion list is now rendered globally, not here */}
                       </td>
-                      <td className="border border-gray-300 px-2 py-1">
+                      {/* <td className="border border-gray-300 px-2 py-1">
                         <Input
                           value={item.hsn}
                           onChange={(e) => updateItem(index, 'hsn', e.target.value)}
                           className="w-full"
                         />
-                      </td>
+                      </td> */}
                       <td className="border border-gray-300 px-2 py-1">
                         <Input
                           type="number"
@@ -523,6 +642,7 @@ const GenerateInvoice = () => {
                           min={0}
                           value={item.price}
                           onChange={(e) => updateItem(index, 'price', Number(e.target.value))}
+                          step="0.01" // Added step for two decimal places
                           className="w-full"
                         />
                       </td>
@@ -545,7 +665,8 @@ const GenerateInvoice = () => {
                 </tbody>
               </table>
             </div>
-            <div className="mt-3">
+            {/* UI Update: Move Add Product button to the right */}
+            <div className="mt-3 flex justify-end"> {/* Added flex and justify-end */}
               <Button variant="outline" size="sm" onClick={addItem}>
                 <Plus className="h-4 w-4 mr-1" />
                 Add Product
@@ -576,6 +697,31 @@ const GenerateInvoice = () => {
           </Button>
         </div>
       </div>
+
+      {/* GLOBAL PRODUCT SUGGESTIONS LIST - RENDERED OUTSIDE THE TABLE */}
+      {/* This list is positioned absolutely based on the active input's coordinates */}
+      {suggestionBoxPosition && productSuggestions.length > 0 && activeProductInputIndex !== null && items[activeProductInputIndex]?.productName.trim().length >= 2 && (
+        <ul
+          id="product-suggestions-list" // Added ID for blur detection
+          className="absolute z-[100] bg-white border rounded-md max-h-48 overflow-y-auto shadow-lg"
+          style={{
+            top: suggestionBoxPosition.top + suggestionBoxPosition.width/2 + 20, // Position below the input
+            left: suggestionBoxPosition.left,
+            width: suggestionBoxPosition.width,
+          }}
+        >
+          {productSuggestions.map((suggestion, idx) => (
+            <li
+              key={idx}
+              onMouseDown={(e) => e.preventDefault()} // Crucial: Prevents input blur when clicking suggestion
+              onClick={() => handleProductSuggestionClick(suggestion)}
+              className="cursor-pointer px-3 py-1 hover:bg-gray-100"
+            >
+              {suggestion}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };
