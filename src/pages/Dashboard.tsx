@@ -58,7 +58,7 @@ const Dashboard = () => {
       setStatsError(null);
 
       try {
-        const apiUrl = `http://localhost:5062/Invoices/DashBoardSummary?partnerName=${partnerName}`;
+        const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/DashBoardSummary?partnerName=${partnerName}`;
         const response = await fetch(apiUrl, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -191,6 +191,40 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Dashboard</h2>
+          <p className="text-gray-600">Manage your invoices, customers, and business operations</p>
+        </div>
+        
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {dashboardItems.map((item, index) => (
+            <Card 
+              key={index} 
+              className="hover:shadow-lg transition-shadow cursor-pointer group"
+              onClick={() => navigate(item.path)}
+            >
+              <CardHeader className="pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`${item.color} p-2 rounded-lg group-hover:scale-110 transition-transform`}>
+                    <item.icon className="h-5 w-5 text-white" />
+                  </div>
+                  <CardTitle className="text-lg">{item.title}</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-sm">
+                  {item.description}
+                </CardDescription>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="line-container">
+            <div className="line"></div>
+             <span className="text">Statistics</span>
+         </div>
         {/* Quick Stats */}
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
           {isLoadingStats ? (
@@ -211,9 +245,9 @@ const Dashboard = () => {
                     <TrendingUp className="h-4 w-4 text-red-600" />
                 </CardHeader>
                 <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                  ₹{totalOutstanding !== null ? totalOutstanding.toLocaleString() : 'N/A'}
-                </div>
+                  <div className="text-2xl font-bold text-red-600">
+                    ₹{totalOutstanding !== null ? totalOutstanding.toLocaleString() : 'N/A'}
+                  </div>
                   <p className="text-xs text-muted-foreground">Amount pending from customers</p>
                 </CardContent>
               </Card>
@@ -242,34 +276,6 @@ const Dashboard = () => {
               <p className="text-sm text-gray-500">View payment balance and analytics</p>
             </div>
           </Card>
-        </div>
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Dashboard</h2>
-          <p className="text-gray-600">Manage your invoices, customers, and business operations</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {dashboardItems.map((item, index) => (
-            <Card 
-              key={index} 
-              className="hover:shadow-lg transition-shadow cursor-pointer group"
-              onClick={() => navigate(item.path)}
-            >
-              <CardHeader className="pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className={`${item.color} p-2 rounded-lg group-hover:scale-110 transition-transform`}>
-                    <item.icon className="h-5 w-5 text-white" />
-                  </div>
-                  <CardTitle className="text-lg">{item.title}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-sm">
-                  {item.description}
-                </CardDescription>
-              </CardContent>
-            </Card>
-          ))}
         </div>
       </div>
     </div>

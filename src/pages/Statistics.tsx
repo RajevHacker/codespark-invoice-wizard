@@ -48,7 +48,7 @@ const Statistics = () => {
       setError(null);
 
       try {
-        const apiUrl = `http://localhost:5062/Invoices/DashBoardSummary?partnerName=${partnerName}`;
+        const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/DashBoardSummary?partnerName=${partnerName}`;
         const response = await fetch(apiUrl, {
           headers: {
             Authorization: `Bearer ${token}`,
