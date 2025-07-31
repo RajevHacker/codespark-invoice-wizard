@@ -340,8 +340,8 @@ const AddPurchaseEntry = () => {
                     <Label htmlFor="gst5">5%</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="9" id="gst9" />
-                    <Label htmlFor="gst9">9%</Label>
+                    <RadioGroupItem value="18" id="gst18" />
+                    <Label htmlFor="gst18">18%</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="other" id="gstOther" />
