@@ -78,7 +78,7 @@ const ReportGeneration = () => {
         partnerName,
       });
 
-      const url = `http://localhost:5062/Invoices/GetPurchaseList?${params}`;
+      const url = `https://invoicegenerator-bktt.onrender.com/Invoices/GetPurchaseList?${params}`;
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },

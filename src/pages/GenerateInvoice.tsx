@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, FileText } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, FileText, RefreshCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,13 +18,13 @@ interface ProductItem {
 
 const GenerateInvoice = () => {
   const navigate = useNavigate();
-  const { token, partnerName } = useAuth(); // Custom hook for auth
+  const { token, partnerName } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [invoiceData, setInvoiceData] = useState({
-    invoiceNumber: `INV-${Date.now()}`,
+    invoiceNumber: '',
     name: '',
-    currentDate: new Date().toISOString().split('T')[0],
+    CurrentDate: new Date().toISOString().split('T')[0],
     noOfBales: 0,
     transport: '',
   });
@@ -32,6 +32,47 @@ const GenerateInvoice = () => {
   const [items, setItems] = useState<ProductItem[]>([
     { sNo: 1, productName: '', hsn: '', qty: 1, price: 0 }
   ]);
+
+  // Fetch Invoice Number
+  const fetchInvoiceNumber = async () => {
+    try {
+      const response = await fetch(`http://localhost:5062/Invoices/GetInvoiceNumber?partnerName=${partnerName}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to fetch invoice number');
+      }
+  
+      const rawText = await response.text();
+      const invoiceNumber = rawText.replace(/"/g, ''); // remove quotes if present
+      return invoiceNumber;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: (error as Error).message,
+        variant: "destructive"
+      });
+      return '';
+    }
+  };  
+
+  // Fetch invoice number on mount
+  useEffect(() => {
+    const loadInvoiceNumber = async () => {
+      if (token && partnerName) {
+        const invNum = await fetchInvoiceNumber();
+        if (invNum) {
+          setInvoiceData(prev => ({ ...prev, invoiceNumber: invNum }));
+        }
+      }
+    };
+
+    loadInvoiceNumber();
+  }, [token, partnerName]);
 
   const addItem = () => {
     setItems([...items, {
@@ -57,8 +98,12 @@ const GenerateInvoice = () => {
     setItems(newItems);
   };
 
-  const calculateTotal = () => {
+  const calculateSubtotal = () => {
     return items.reduce((total, item) => total + (item.qty * item.price), 0);
+  };
+
+  const calculateGST = (subtotal: number) => {
+    return subtotal * 0.05;
   };
 
   const handleGenerateInvoice = async () => {
@@ -74,7 +119,7 @@ const GenerateInvoice = () => {
     try {
       setIsGenerating(true);
 
-      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/InvoiceGenerator?partnerName=${partnerName}`, {
+      const response = await fetch(`http://localhost:5062/Invoices/InvoiceGenerator?partnerName=${partnerName}`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -90,7 +135,6 @@ const GenerateInvoice = () => {
 
       const result = await response.json(); // { invoiceNumber, fileUrl }
 
-      // ✅ Open PDF in new tab
       window.open(result.fileUrl, '_blank');
 
       toast({
@@ -99,11 +143,13 @@ const GenerateInvoice = () => {
         duration: 7000,
       });
 
-      // ✅ Reset form
+      // Refresh invoice number for next invoice
+      const nextInvNum = await fetchInvoiceNumber();
+
       setInvoiceData({
-        invoiceNumber: `INV-${Date.now()}`,
+        invoiceNumber: nextInvNum || '',
         name: '',
-        currentDate: new Date().toISOString().split('T')[0],
+        CurrentDate: new Date().toISOString().split('T')[0],
         noOfBales: 0,
         transport: '',
       });
@@ -120,6 +166,10 @@ const GenerateInvoice = () => {
       setIsGenerating(false);
     }
   };
+
+  const subtotal = calculateSubtotal();
+  const gst = calculateGST(subtotal);
+  const grandTotal = subtotal + gst;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -140,23 +190,37 @@ const GenerateInvoice = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Basic Invoice Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="relative">
                 <Label htmlFor="invoiceNumber">Invoice Number</Label>
                 <Input
                   id="invoiceNumber"
                   value={invoiceData.invoiceNumber}
+                  readOnly
                   onChange={(e) => setInvoiceData({ ...invoiceData, invoiceNumber: e.target.value })}
                 />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute right-1 top-[35px]"
+                  onClick={async () => {
+                    const inv = await fetchInvoiceNumber();
+                    if (inv) {
+                      setInvoiceData(prev => ({ ...prev, invoiceNumber: inv }));
+                      toast({ title: "Invoice number refreshed" });
+                    }
+                  }}
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                </Button>
               </div>
               <div>
                 <Label htmlFor="currentDate">Date</Label>
                 <Input
                   id="currentDate"
                   type="date"
-                  value={invoiceData.currentDate}
-                  onChange={(e) => setInvoiceData({ ...invoiceData, currentDate: e.target.value })}
+                  value={invoiceData.CurrentDate}
+                  onChange={(e) => setInvoiceData({ ...invoiceData, CurrentDate: e.target.value })}
                 />
               </div>
               <div>
@@ -188,7 +252,7 @@ const GenerateInvoice = () => {
               </div>
             </div>
 
-            {/* Items Section */}
+            {/* Invoice Items Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Invoice Items</h3>
@@ -259,15 +323,21 @@ const GenerateInvoice = () => {
                 ))}
               </div>
 
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <div className="text-right">
-                  <div className="text-xl font-bold">
-                    Grand Total: ₹{calculateTotal().toFixed(2)}
-                  </div>
+              {/* Totals */}
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg space-y-2">
+                <div className="text-right font-medium">
+                  Subtotal: ₹{subtotal.toFixed(2)}
+                </div>
+                <div className="text-right font-medium text-blue-700">
+                  GST (5%): ₹{gst.toFixed(2)}
+                </div>
+                <div className="text-right text-xl font-bold text-green-700">
+                  Grand Total: ₹{grandTotal.toFixed(2)}
                 </div>
               </div>
             </div>
 
+            {/* Buttons */}
             <div className="flex gap-4 pt-4">
               <Button onClick={handleGenerateInvoice} className="flex-1" disabled={isGenerating}>
                 {isGenerating ? 'Generating Invoice...' : 'Generate Invoice'}

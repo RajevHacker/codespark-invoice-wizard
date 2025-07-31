@@ -79,8 +79,8 @@ const ReportGeneration = () => {
       });
 
       const url = reportType === 'sales'
-        ? `http://localhost:5062/Invoices/GetSalesList?${params}`
-        : `http://localhost:5062/Invoices/GetPurchaseList?${params}`;
+        ? `https://invoicegenerator-bktt.onrender.com/Invoices/GetSalesList?${params}`
+        : `https://invoicegenerator-bktt.onrender.com/Invoices/GetPurchaseList?${params}`;
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
