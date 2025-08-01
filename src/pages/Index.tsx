@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, User, Lock, Briefcase } from 'lucide-react';
-
+import config from '../config';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/pages/AuthContext";
-
 const Index = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -30,7 +29,7 @@ const Index = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('https://invoicegenerator-bktt.onrender.com/Auth/login', {
+      const response = await fetch(`${config.BACKEND_HOST}/Auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, Save, Search, Loader } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
-
+import config from '../config';
 const UpdateCustomer = () => {
   const navigate = useNavigate();
   const { token, partnerName } = useAuth();
@@ -50,7 +50,7 @@ const UpdateCustomer = () => {
     try {
       setIsLoading(true);
       const response = await fetch(
-        `https://invoicegenerator-bktt.onrender.com/Invoices/getCustomerByName?customerName=${encodeURIComponent(searchName)}&partnerName=${partnerName}`,
+        `${config.BACKEND_HOST}/Invoices/getCustomerByName?customerName=${encodeURIComponent(searchName)}&partnerName=${partnerName}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -102,7 +102,7 @@ const UpdateCustomer = () => {
     try {
       setIsLoading(true);
       const response = await fetch(
-        `https://invoicegenerator-bktt.onrender.com/Invoices/updateCustomerDetail?partnerName=${partnerName}`,
+        `${config.BACKEND_HOST}/Invoices/updateCustomerDetail?partnerName=${partnerName}`,
         {
           method: 'PUT',
           headers: {

@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, XCircle, Search } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
-
+import config from '../config';
 interface BillHistoryEntry {
   customerName: string;
   gstNumber?: string;
@@ -49,7 +49,7 @@ const CancelInvoice = () => {
 
     try {
       const response = await fetch(
-        `https://invoicegenerator-bktt.onrender.com/Invoices/SearchCustomers?partnerName=${encodeURIComponent(partnerName)}&searchValue=${encodeURIComponent(searchValue)}&sheetName=BillHistory`,
+        `${config.BACKEND_HOST}/Invoices/SearchCustomers?partnerName=${encodeURIComponent(partnerName)}&searchValue=${encodeURIComponent(searchValue)}&sheetName=BillHistory`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -89,7 +89,7 @@ const CancelInvoice = () => {
 
     try {
       const response = await fetch(
-        `https://invoicegenerator-bktt.onrender.com/Invoices/getCancelInvoiceDetails?invoiceNumber=${encodeURIComponent(searchInvoice)}&partnerName=${encodeURIComponent(partnerName)}`,
+        `${config.BACKEND_HOST}/Invoices/getCancelInvoiceDetails?invoiceNumber=${encodeURIComponent(searchInvoice)}&partnerName=${encodeURIComponent(partnerName)}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -126,7 +126,7 @@ const CancelInvoice = () => {
 
     try {
       const response = await fetch(
-        `https://invoicegenerator-bktt.onrender.com/Invoices/cancel?invoiceNumber=${encodeURIComponent(invoiceData.invoiceNumber!)}&partnerName=${encodeURIComponent(partnerName)}`,
+        `${config.BACKEND_HOST}/Invoices/cancel?invoiceNumber=${encodeURIComponent(invoiceData.invoiceNumber!)}&partnerName=${encodeURIComponent(partnerName)}`,
         {
           method: "POST",
           headers: {

@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Loader } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
-
+import config from '../config';
 // Updated PaymentReport interface to match the JSON keys from your C# API
 interface PaymentReport {
   customerName: string;
@@ -62,7 +62,7 @@ const RecordPurchasePayment = () => {
     try {
       // Construct the API URL for recent transactions
       // Ensure this URL matches your backend endpoint for recent transactions
-      const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/GetRecentPaymentTransaction?partnerName=${partnerName}&paymentType=PurchasePayment`;
+      const apiUrl = `${config.BACKEND_HOST}/Invoices/GetRecentPaymentTransaction?partnerName=${partnerName}&paymentType=PurchasePayment`;
       const resp = await fetch(apiUrl, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -121,7 +121,7 @@ const RecordPurchasePayment = () => {
 
     try {
       // Construct the API URL for customer search suggestions
-      const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(value)}&sheetName=PurchaseCustomer`;
+      const apiUrl = `${config.BACKEND_HOST}/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(value)}&sheetName=PurchaseCustomer`;
       const resp = await fetch(apiUrl, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -156,7 +156,7 @@ const RecordPurchasePayment = () => {
 
     try {
       const resp = await fetch(
-        `https://invoicegenerator-bktt.onrender.com/Invoices/purchasePaymentPending?partnerName=${partnerName}&customerName=${encodeURIComponent(searchTerm)}`,
+        `${config.BACKEND_HOST}/Invoices/purchasePaymentPending?partnerName=${partnerName}&customerName=${encodeURIComponent(searchTerm)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -199,7 +199,7 @@ const RecordPurchasePayment = () => {
 
     try {
       const resp = await fetch(
-        `https://invoicegenerator-bktt.onrender.com/Invoices/PaymentEntry?partnerName=${partnerName}&paymentType=PurchasePayment`,
+        `${config.BACKEND_HOST}/Invoices/PaymentEntry?partnerName=${partnerName}&paymentType=PurchasePayment`,
         {
           method: "POST",
           headers: {

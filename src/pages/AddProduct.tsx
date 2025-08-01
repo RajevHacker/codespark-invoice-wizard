@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Package, Save, Loader } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext"; // Make sure your AuthContext exports useAuth()
-
+import config from '../config';
 const AddProduct = () => {
   const navigate = useNavigate();
   const { token, partnerName } = useAuth();
@@ -38,7 +38,7 @@ const AddProduct = () => {
 
     try {
       setIsLoading(true);
-      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/addProduct?partnerName=${partnerName}`, {
+      const response = await fetch(`${config.BACKEND_HOST}/Invoices/addProduct?partnerName=${partnerName}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

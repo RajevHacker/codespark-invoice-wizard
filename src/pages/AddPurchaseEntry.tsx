@@ -14,7 +14,7 @@ import { ArrowLeft, Loader } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-
+import config from '../config';
 const AddPurchaseEntry = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -56,7 +56,7 @@ const AddPurchaseEntry = () => {
 
       try {
         const response = await fetch(
-          `https://invoicegenerator-bktt.onrender.com/Invoices/getPurchaseCustomerGST?partnerName=${partnerName}&consumerName=${encodeURIComponent(customerName)}`,
+          `${config.BACKEND_HOST}/Invoices/getPurchaseCustomerGST?partnerName=${partnerName}&consumerName=${encodeURIComponent(customerName)}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -94,7 +94,7 @@ const AddPurchaseEntry = () => {
     }
 
     try {
-      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/updatePurchaseCustomerGST?partnerName=${partnerName}`, {
+      const response = await fetch(`${config.BACKEND_HOST}/Invoices/updatePurchaseCustomerGST?partnerName=${partnerName}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -162,7 +162,7 @@ const AddPurchaseEntry = () => {
       setIsLoading(true);
 
       const response = await fetch(
-        `https://invoicegenerator-bktt.onrender.com/Invoices/AddPurchaseOrder?partnerName=${partnerName}`,
+        `${config.BACKEND_HOST}/Invoices/AddPurchaseOrder?partnerName=${partnerName}`,
         {
           method: 'POST',
           headers: {

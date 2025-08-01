@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Save, Loader } from 'lucide-react'; // Added Loader icon
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
-
+import config from '../config';
 // Interface for the data returned by GetRecentPaymentTransaction API
 interface PaymentReport {
   customerName: string;
@@ -67,7 +67,7 @@ const RecordPayment = () => {
     setIsRecentLoading(true);
     try {
       // API call for recent payment transactions
-      const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/GetRecentPaymentTransaction?partnerName=${partnerName}&paymentType=Payments`;
+      const apiUrl = `${config.BACKEND_HOST}/Invoices/GetRecentPaymentTransaction?partnerName=${partnerName}&paymentType=Payments`;
       const resp = await fetch(apiUrl, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -112,7 +112,7 @@ const RecordPayment = () => {
 
     try {
       const response = await fetch(
-        `https://invoicegenerator-bktt.onrender.com/Invoices/SearchCustomers?partnerName=${encodeURIComponent(partnerName)}&searchValue=${encodeURIComponent(searchValue)}&sheetName=CustomerDetails`,
+        `${config.BACKEND_HOST}/Invoices/SearchCustomers?partnerName=${encodeURIComponent(partnerName)}&searchValue=${encodeURIComponent(searchValue)}&sheetName=CustomerDetails`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -177,7 +177,7 @@ const RecordPayment = () => {
     }
 
     try {
-      const response = await fetch(`https://invoicegenerator-bktt.onrender.com/Invoices/PaymentEntry?partnerName=${encodeURIComponent(partnerName)}&paymentType=Payments`, {
+      const response = await fetch(`${config.BACKEND_HOST}/Invoices/PaymentEntry?partnerName=${encodeURIComponent(partnerName)}&paymentType=Payments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

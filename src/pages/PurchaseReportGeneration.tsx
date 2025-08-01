@@ -20,7 +20,7 @@ import { ArrowLeft, FileText, Download } from 'lucide-react';
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
-
+import config from '../config';
 interface ReportData {
   customerName: string;
   gstNumber: string;
@@ -96,7 +96,7 @@ const ReportGeneration = () => {
 
     try {
       // Corrected URL for Purchase Customers
-      const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(value)}&sheetName=PurchaseCustomer`;
+      const apiUrl = `${config.BACKEND_HOST}/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(value)}&sheetName=PurchaseCustomer`;
       const resp = await fetch(apiUrl, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -146,7 +146,7 @@ const ReportGeneration = () => {
         partnerName,
       });
 
-      const url = `https://invoicegenerator-bktt.onrender.com/Invoices/GetPurchaseList?${params}`;
+      const url = `${config.BACKEND_HOST}/Invoices/GetPurchaseList?${params}`;
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },

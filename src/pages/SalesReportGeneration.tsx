@@ -20,7 +20,7 @@ import { ArrowLeft, FileText, Download } from 'lucide-react';
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
-
+import config from '../config';
 interface ReportData {
   customerName: string;
   gstNumber: string;
@@ -95,7 +95,7 @@ const ReportGeneration = () => {
     if (!token || !partnerName) return;
 
     try {
-      const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(value)}&sheetName=CustomerDetails`;
+      const apiUrl = `${config.BACKEND_HOST}/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(value)}&sheetName=CustomerDetails`;
       const resp = await fetch(apiUrl, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -146,8 +146,8 @@ const ReportGeneration = () => {
       });
 
       const url = reportType === 'sales'
-        ? `https://invoicegenerator-bktt.onrender.com/Invoices/GetSalesList?${params}`
-        : `https://invoicegenerator-bktt.onrender.com/Invoices/GetPurchaseList?${params}`; // This part will likely not be hit since reportType is fixed to 'sales'
+        ? `${config.BACKEND_HOST}/Invoices/GetSalesList?${params}`
+        : `${config.BACKEND_HOST}/Invoices/GetPurchaseList?${params}`; // This part will likely not be hit since reportType is fixed to 'sales'
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },

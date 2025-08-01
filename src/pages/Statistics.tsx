@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext"; // Assuming useAuth provides token and partnerName
-
+import config from '../config';
 // Define interfaces for the backend response
 interface DuePayment {
   name: string;
@@ -48,7 +48,7 @@ const Statistics = () => {
       setError(null);
 
       try {
-        const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/DashBoardSummary?partnerName=${partnerName}`;
+        const apiUrl = `${config.BACKEND_HOST}/Invoices/DashBoardSummary?partnerName=${partnerName}`;
         const response = await fetch(apiUrl, {
           headers: {
             Authorization: `Bearer ${token}`,

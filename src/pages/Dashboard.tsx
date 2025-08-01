@@ -6,7 +6,7 @@ import {
   Building2, FileText, Users, Package, CreditCard, BarChart3, XCircle, LogOut, ShoppingCart, Receipt, FileBarChart, TrendingUp, Loader
 } from 'lucide-react';
 import { useAuth } from "@/pages/AuthContext"; // Assuming useAuth provides token and partnerName
-
+import config from '../config';
 // Define interfaces for the backend response
 interface DuePayment {
   name: string;
@@ -58,7 +58,7 @@ const Dashboard = () => {
       setStatsError(null);
 
       try {
-        const apiUrl = `https://invoicegenerator-bktt.onrender.com/Invoices/DashBoardSummary?partnerName=${partnerName}`;
+        const apiUrl = `${config.BACKEND_HOST}/Invoices/DashBoardSummary?partnerName=${partnerName}`;
         const response = await fetch(apiUrl, {
           headers: {
             Authorization: `Bearer ${token}`,
