@@ -226,7 +226,7 @@ const Dashboard = () => {
              <span className="text">Statistics</span>
          </div>
         {/* Quick Stats */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
           {isLoadingStats ? (
             <Card className="col-span-full flex items-center justify-center p-8">
               <Loader className="h-8 w-8 animate-spin text-blue-500 mr-3" />
@@ -265,7 +265,7 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
             </>
-          )}
+          )} */}
           
           <Card className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer"  onClick={() => navigate('/statistics')}>
             <div className="bg-indigo-500 p-3 rounded-lg text-white flex items-center justify-center">
@@ -278,7 +278,7 @@ const Dashboard = () => {
           </Card>
         </div>
       </div>
-    </div>
+    // </div>
   );
 };
 

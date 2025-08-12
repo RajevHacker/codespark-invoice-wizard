@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, Save, Search, Loader } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/pages/AuthContext";
-import config from '../config';
+import config from '../config'; // Assuming config is correctly imported
+
 const UpdateCustomer = () => {
   const navigate = useNavigate();
   const { token, partnerName } = useAuth();
@@ -16,6 +17,8 @@ const UpdateCustomer = () => {
   const [searchName, setSearchName] = useState('');
   const [customerFound, setCustomerFound] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSearchingSuggestions, setIsSearchingSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState([]); // New state for suggestions
   const [customerData, setCustomerData] = useState({
     name: '',
     address: '',
@@ -25,6 +28,8 @@ const UpdateCustomer = () => {
     gstNo: '',
     email: ''
   });
+
+  const suggestionRef = useRef(null); // Ref for the suggestion list to handle outside clicks
 
   // Guard if auth missing
   if (!partnerName || !token) {
@@ -36,6 +41,61 @@ const UpdateCustomer = () => {
       </div>
     );
   }
+
+  // Function to fetch customer suggestions
+  const fetchSuggestions = useCallback(async (value) => {
+    if (!value.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    setIsSearchingSuggestions(true);
+    try {
+      const response = await fetch(
+        `${config.BACKEND_HOST}/Invoices/SearchCustomers?partnerName=${partnerName}&searchValue=${encodeURIComponent(value)}&sheetName=CustomerDetails`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch suggestions");
+      }
+
+      const data = await response.json();
+      setSuggestions(data);
+    } catch (error) {
+      console.error("Error fetching suggestions:", error);
+      setSuggestions([]);
+    } finally {
+      setIsSearchingSuggestions(false);
+    }
+  }, [partnerName, token]);
+
+  // Debounce the suggestion search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      fetchSuggestions(searchName);
+    }, 300); // 300ms debounce time
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchName, fetchSuggestions]);
+
+  // Handle click outside suggestions to close them
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (suggestionRef.current && !suggestionRef.current.contains(event.target)) {
+        setSuggestions([]);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handleSearch = async () => {
     if (!searchName.trim()) {
@@ -66,6 +126,7 @@ const UpdateCustomer = () => {
       const data = await response.json();
       setCustomerData(data);
       setCustomerFound(true);
+      setSuggestions([]); // Clear suggestions after a successful search
 
       toast({
         title: "Success",
@@ -78,6 +139,15 @@ const UpdateCustomer = () => {
         variant: "destructive"
       });
       setCustomerFound(false);
+      setCustomerData({ // Reset customer data if not found
+        name: '',
+        address: '',
+        contactNumber: '',
+        state: '',
+        stateCode: '',
+        gstNo: '',
+        email: ''
+      });
     } finally {
       setIsLoading(false);
     }
@@ -113,7 +183,10 @@ const UpdateCustomer = () => {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to update customer");
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err || "Failed to update customer");
+      }
 
       toast({
         title: "Success",
@@ -122,12 +195,19 @@ const UpdateCustomer = () => {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update customer. Please try again.",
+        description: (error as Error).message || "Failed to update customer. Please try again.",
         variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSuggestionClick = (name) => {
+    setSearchName(name);
+    setSuggestions([]); // Clear suggestions
+    // Optionally, trigger search immediately after selecting a suggestion
+    // handleSearch(); // This would call handleSearch with the new searchName
   };
 
   return (
@@ -150,7 +230,7 @@ const UpdateCustomer = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4">
+            <div className="relative flex gap-4">
               <Input
                 placeholder="Enter customer name to search"
                 value={searchName}
@@ -165,6 +245,27 @@ const UpdateCustomer = () => {
                   </span>
                 ) : "Search"}
               </Button>
+
+              {/* Suggestions List */}
+              {searchName.trim() && suggestions.length > 0 && (
+                <ul ref={suggestionRef} className="absolute z-10 w-[calc(100%-100px)] bg-white border border-gray-200 rounded-md shadow-lg mt-12 max-h-60 overflow-y-auto">
+                  {isSearchingSuggestions ? (
+                    <li className="p-2 text-gray-500 flex items-center">
+                      <Loader className="animate-spin h-4 w-4 mr-2" /> Loading suggestions...
+                    </li>
+                  ) : (
+                    suggestions.map((suggestion, index) => (
+                      <li
+                        key={index}
+                        className="p-2 cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSuggestionClick(suggestion)}
+                      >
+                        {suggestion}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -278,6 +379,7 @@ const UpdateCustomer = () => {
                         gstNo: '',
                         email: ''
                       });
+                      setSuggestions([]); // Clear suggestions on reset
                     }}
                   >
                     Reset
