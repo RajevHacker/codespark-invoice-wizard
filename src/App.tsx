@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import SalesReportGeneration from "./pages/SalesReportGeneration";
 import PurchaseReportGeneration from "./pages/PurchaseReportGeneration";
 import { AuthProvider } from "@/pages/AuthContext";
+import SalesBalanceList from "@/pages/SalesBalanceList";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => (
             <Route path="/SalesReportGeneration" element={<SalesReportGeneration />} />
             <Route path="/PurchaseReportGeneration" element={<PurchaseReportGeneration />} />
             <Route path="/statistics" element={<Statistics />} />
+            <Route path="/sales-balance-list" element={<SalesBalanceList />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
