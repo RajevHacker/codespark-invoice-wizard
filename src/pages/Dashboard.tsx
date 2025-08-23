@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
 import {
-  Building2, FileText, Users, Package, CreditCard, BarChart3, XCircle, LogOut, ShoppingCart, Receipt, FileBarChart, TrendingUp
+  Building2, FileText, Users, Package, CreditCard, BarChart3, XCircle, LogOut, ShoppingCart, Receipt, FileBarChart, TrendingUp, RotateCcw
 } from 'lucide-react';
 import { useAuth } from "@/pages/AuthContext";
 import config from '../config';
@@ -138,11 +138,23 @@ const Dashboard = () => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Dashboard</h2>
-          <p className="text-gray-600">Manage your invoices, customers, and business operations</p>
+        {/* Dashboard Heading + Reset Button */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+            <p className="text-gray-600">Manage your invoices, customers, and business operations</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-blue-600 text-white hover:bg-blue-700"
+            onClick={() => navigate('/reset-financial-year')}
+          >
+            Reset Financial Year
+          </Button>
         </div>
         
+        {/* Dashboard Items */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {dashboardItems.map((item, index) => (
             <Card 

@@ -21,6 +21,8 @@ import SalesReportGeneration from "./pages/SalesReportGeneration";
 import PurchaseReportGeneration from "./pages/PurchaseReportGeneration";
 import { AuthProvider } from "@/pages/AuthContext";
 import SalesBalanceList from "@/pages/SalesBalanceList";
+import ResetFinancialYear from "./pages/ResetFinancialYear";
+
 
 const queryClient = new QueryClient();
 
@@ -47,6 +49,7 @@ const App = () => (
             <Route path="/PurchaseReportGeneration" element={<PurchaseReportGeneration />} />
             <Route path="/statistics" element={<Statistics />} />
             <Route path="/sales-balance-list" element={<SalesBalanceList />} />
+            <Route path="/reset-financial-year" element={<ResetFinancialYear />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
